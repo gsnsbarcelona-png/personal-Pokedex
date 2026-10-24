@@ -389,7 +389,7 @@
     var n = Number(pk.dataset.n);
     if (e.target.closest('.info-btn')) { openDetail(n); return; }
     if (e.target.closest('.fa-btn')) { if (fa.has(n)) fa.delete(n); else { fa.add(n); have.add(n); } }
-    else if (e.target.closest('.slot')) { if (have.has(n)) { have.delete(n); fa.delete(n); } else have.add(n); }
+    else if (e.target.closest('.slot')) { if (have.has(n)) { openDetail(n); return; } have.add(n); }
     else return;
     save(); refresh();
   });

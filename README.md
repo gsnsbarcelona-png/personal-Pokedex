@@ -25,7 +25,9 @@ La cámara solo funciona con `https`, y GitHub Pages ya lo incluye.
 
 | Acción | Cómo |
 | --- | --- |
-| Marcar o desmarcar una carta | Tocar el bolsillo |
+| Marcar una carta como tuya | Tocar el bolsillo vacío |
+| Ver el detalle de una carta que ya tienes | Tocar el bolsillo (no la quita) |
+| Quitar una carta | `⋯` → desmarcar «La tengo» |
 | Marcar full art | Botón `FA` del bolsillo (también marca la carta como tuya) |
 | Ver o editar el detalle | Botón `⋯` del bolsillo |
 | Escanear | Botón rojo **Escanear** → **Abrir cámara** o **Foto o galería** |
