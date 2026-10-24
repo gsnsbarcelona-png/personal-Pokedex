@@ -602,7 +602,8 @@
   function setCard(n, card) {
     info[n] = Object.assign({}, info[n], { card: card });
     if (!info[n].lang && card.lang) info[n].lang = { es: 'Español', en: 'Inglés', 'zh-cn': 'Chino simplificado', ja: 'Japonés' }[card.lang] || '';
-    have.add(n); save(); refresh();
+    have.add(n); if (isFA(card.rarity)) fa.add(n);
+    save(); refresh();
   }
   function refreshPrice(n, btn) {
     var cd = info[n] && info[n].card; if (!cd) return;
@@ -790,7 +791,7 @@
 
   function setScanStatus(t) { $('scanStatus').textContent = t; }
 
-  var scanNum = null, pickedCard = null, choiceTok = 0;
+  var scanNum = null, scanRar = null, pickedCard = null, choiceTok = 0;
   function cropBottom(canvas, frac) {
     var h = Math.round(canvas.height * frac);
     var c = document.createElement('canvas'); c.width = canvas.width; c.height = h;
@@ -831,6 +832,7 @@
           b.appendChild(el('span', 'pr', eurText(c.eur)));
           b.addEventListener('click', function () {
             var on = pickedCard !== c; pickedCard = on ? c : null;
+            if (on && isFA(c.rarity)) $('scanFa').checked = true;
             grid.querySelectorAll('.cc').forEach(function (x) { x.setAttribute('aria-pressed', x === b && on ? 'true' : 'false'); });
           });
           grid.appendChild(b);
@@ -849,7 +851,7 @@
     $('scanLangCard').value = $('scanLang').value === 'chi_sim' ? 'Chino simplificado' : 'Español';
     cands.forEach(function (n) { addCandBtn(n, false); });
     if (cands.length) selectCand(cands[0]); else { picked = 0; $('scanSave').disabled = true; loadChoices(); }
-    $('scanFa').checked = false;
+    $('scanFa').checked = !!scanRar || !!(picked && fa.has(picked));
   }
   function addCandBtn(n) {
     var b = el('button', 'cand', '#' + pad(n) + ' ' + nameOf(n)); b.type = 'button';
@@ -867,7 +869,7 @@
     });
     if (!found) addCandBtn(n), selectCand(n);
     $('scanSave').disabled = !picked;
-    $('scanFa').checked = fa.has(n);
+    $('scanFa').checked = fa.has(n) || !!scanRar;
     if (changed) loadChoices();
   }
   $('scanSearch').addEventListener('input', function (e) {
@@ -880,32 +882,55 @@
     if (hit) selectCand(hit);
   });
 
-  function runOcr(canvas) {
-    var lang = $('scanLang').value;
-    $('scanPick').hidden = true;
-    scanCanvas = canvas; scanNum = null; picked = 0;
-    $('scanPrev').src = canvas.toDataURL('image/jpeg', 0.5); $('scanPrev').hidden = false;
-    setScanStatus('Cargando el lector de texto (la primera vez tarda unos segundos)…');
-    loadTesseract().then(function () {
-      return getWorker(lang, function (m) {
-        if (m && m.status === 'recognizing text') setScanStatus('Leyendo la carta… ' + Math.round((m.progress || 0) * 100) + ' %');
-      });
+  function enhance(c, w) {
+    var o = document.createElement('canvas'); o.width = w; o.height = Math.round(c.height * w / c.width);
+    var x = o.getContext('2d'); x.filter = 'grayscale(1) contrast(1.6)'; x.drawImage(c, 0, 0, o.width, o.height);
+    return o;
+  }
+  /* códigos de rareza que llevan las cartas chinas y japonesas: SAR, SR, UR... */
+  function parseRarity(text) {
+    var m = text.toUpperCase().match(/\b(SAR|SSR|CSR|CHR|HR|UR|SR|AR)\b/);
+    return m ? m[1] : null;
+  }
+  function isFA(r) { return !!r && /illustration|ultra|hyper|secret|full art|rainbow|special art|^(SAR|SSR|CSR|CHR|HR|UR|SR|AR)$/i.test(r); }
+  function ocrPass(lang, canvas) {
+    return getWorker(lang, function (m) {
+      if (m && m.status === 'recognizing text') setScanStatus('Leyendo la carta… ' + Math.round((m.progress || 0) * 100) + ' %');
     }).then(function (w) {
-      var top = cropTop(canvas, 0.4);
-      return w.recognize(top).then(function (r) {
-        var c = findCandidates(r.data.text, lang);
-        var pc = c.length ? Promise.resolve(c) : (setScanStatus('Probando con la carta entera…'), w.recognize(canvas).then(function (r2) { return findCandidates(r2.data.text, lang); }));
-        return pc.then(function (cands) {
-          setScanStatus('Leyendo el número de la carta…');
-          return w.recognize(cropBottom(canvas, 0.16)).then(function (rb) {
-            scanNum = parseNumber(rb.data.text);
-            return cands;
-          });
+      var res = { lang: lang, cands: [], text: '' };
+      return w.recognize(enhance(cropTop(canvas, 0.16), 1000)).then(function (r) {
+        res.text = r.data.text; res.cands = findCandidates(r.data.text, lang);
+        if (res.cands.length) return;
+        return w.recognize(cropTop(canvas, 0.4)).then(function (r2) { res.text += ' ' + r2.data.text; res.cands = findCandidates(r2.data.text, lang); });
+      }).then(function () {
+        if (!res.cands.length) return res;
+        setScanStatus('Leyendo número y rareza…');
+        return w.recognize(enhance(cropBottom(canvas, 0.12), 1000)).then(function (rb) {
+          res.num = parseNumber(rb.data.text); res.rar = parseRarity(rb.data.text);
+          return res;
         });
       });
-    }).then(function (cands) {
-      setScanStatus(cands.length ? 'Esto es lo que parece. Elige la correcta y guarda.' : 'No he reconocido el nombre. Búscalo abajo o haz otra foto más cerca y con luz.');
-      showPick(cands);
+    });
+  }
+
+  function runOcr(canvas) {
+    var first = $('scanLang').value, second = first === 'chi_sim' ? 'eng+spa' : 'chi_sim';
+    $('scanPick').hidden = true;
+    scanCanvas = canvas; scanNum = null; scanRar = null; picked = 0;
+    $('scanPrev').src = canvas.toDataURL('image/jpeg', 0.5); $('scanPrev').hidden = false;
+    setScanStatus('Cargando el lector de texto (la primera vez tarda unos segundos)…');
+    loadTesseract().then(function () { return ocrPass(first, canvas); }).then(function (r) {
+      if (r.cands.length) return r;
+      setScanStatus('No lo reconozco en ese idioma, pruebo con ' + (second === 'chi_sim' ? 'chino' : 'español/inglés') + '…');
+      return ocrPass(second, canvas).then(function (r2) { return r2.cands.length ? r2 : r; });
+    }).then(function (r) {
+      if (r.cands.length) $('scanLang').value = r.lang;
+      scanNum = r.num || null; scanRar = r.rar || null;
+      var read = r.text.replace(/\s+/g, ' ').trim().slice(0, 40);
+      setScanStatus(r.cands.length
+        ? 'Leído: «' + read + '»' + (scanNum ? ' · nº ' + scanNum.num + (scanNum.total ? '/' + scanNum.total : '') : '') + (scanRar ? ' · rareza ' + scanRar + ' (full art)' : '') + '. Elige la correcta y guarda.'
+        : 'No he reconocido el nombre (leí «' + read + '»). Recorta mejor la carta, busca el Pokémon abajo o haz otra foto con luz.');
+      showPick(r.cands);
     }).catch(function () {
       setScanStatus('No he podido cargar el lector de texto. Comprueba la conexión. Puedes buscar el Pokémon a mano abajo.');
       showPick([]);
