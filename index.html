@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14213D">
+<title>Proyecto 151</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Mono:wght@500&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --bg: #E8EBF0; --surface: #F6F7F9; --ink: #101A2E; --muted: #55607A; --line: #BFC7D5;
+    --accent: #D2302A; --accent-ink: #FFFFFF; --own-bg: #14213D; --own-fg: #F6F7F9; --own-sub: #A9B6D3;
+    --scrim: rgba(10,16,30,.55);
+    --foil: linear-gradient(135deg,#F6C445,#EF6F9A,#7A8CFF,#3CC7C0,#F6C445);
+    --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+    --font-mono: 'DM Mono', ui-monospace, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0C111C; --surface: #151C2B; --ink: #E7ECF6; --muted: #93A0B8; --line: #2C3549;
+      --accent: #FF5B4F; --accent-ink: #1A0A09; --own-bg: #E7ECF6; --own-fg: #101A2E; --own-sub: #4A5672;
+      --scrim: rgba(0,0,0,.65); color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+    padding: calc(22px + env(safe-area-inset-top,0px)) max(16px, env(safe-area-inset-right,0px)) calc(110px + env(safe-area-inset-bottom,0px)) max(16px, env(safe-area-inset-left,0px)); }
+  [hidden] { display: none !important; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  .eyebrow { margin: 0; font: 500 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 4px 0 0; font: 800 clamp(34px,9vw,52px)/1 var(--font-display); letter-spacing: -.02em; }
+  .top { display: flex; align-items: flex-start; gap: 12px; }
+  .top > div { flex: 1; min-width: 0; }
+  .iconbtn { height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); font-weight: 500; }
+  .score { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-top: 14px; }
+  .score .big { font: 800 64px/.9 var(--font-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .score .of { font: 600 24px var(--font-display); color: var(--muted); }
+  .score .pct { margin-left: auto; font: 14px var(--font-mono); color: var(--muted); }
+  .bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 12px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .3s; }
+  .stats { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .stats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .sheetmap-title { margin: 0 0 8px; font: 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .sheetmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px,1fr)); gap: 6px; }
+  .sheetmap button { position: relative; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font: 13px var(--font-mono); padding: 0 0 4px; overflow: hidden; }
+  .sheetmap button i { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: var(--accent); }
+  .sheetmap button.done { font-weight: 700; border-color: var(--accent); }
+  .controls { display: flex; flex-direction: column; gap: 10px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 3px; gap: 3px; }
+  .seg button { flex: 1; min-width: 0; height: 36px; border: 0; border-radius: 7px; background: transparent; font-weight: 500; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 700; }
+  .search { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 0 14px; }
+  .pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%,300px),1fr)); gap: 20px; }
+  .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; scroll-margin-top: 12px; }
+  .sheet-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .sheet-head h2 { margin: 0; font: 800 18px var(--font-display); }
+  .sheet-head .rng { font: 12px var(--font-mono); color: var(--muted); }
+  .sheet-head .cnt { margin-left: auto; font: 12px var(--font-mono); }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+  .pocket { position: relative; aspect-ratio: 63/88; }
+  .pocket.blank { border: 1px dashed var(--line); border-radius: 8px; opacity: .5; }
+  .slot { appearance: none; width: 100%; height: 100%; border: 1.5px dashed var(--line); border-radius: 8px; background: transparent; color: var(--muted); padding: 8px 7px 6px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; }
+  .slot .no { font: 11px var(--font-mono); letter-spacing: .04em; }
+  .slot .nm { font: 600 14px/1.12 var(--font-display); overflow-wrap: anywhere; }
+  .slot .sp { display: block; min-height: 22px; }
+  .pocket.own .slot { background: var(--own-bg); color: var(--own-fg); border: 1.5px solid var(--own-bg); }
+  .pocket.own .slot .no { color: var(--own-sub); }
+  .pocket.own.fa .slot { border: 2px solid transparent; background: linear-gradient(var(--own-bg),var(--own-bg)) padding-box, var(--foil) border-box; }
+  .pocket.foto .slot { background-size: cover; background-position: center top; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+  .pocket.foto .slot .no { color: #fff; }
+  .pocket.own.fa.foto .slot { border: 2px solid #F6C445; }
+  .fa-btn, .info-btn { position: absolute; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); font: 10px var(--font-mono); letter-spacing: .04em; padding: 0 5px; }
+  .fa-btn { right: 6px; bottom: 6px; min-width: 30px; }
+  .info-btn { right: 6px; top: 6px; min-width: 24px; }
+  .pocket.own .fa-btn, .pocket.own .info-btn { background: transparent; border-color: var(--own-sub); color: var(--own-sub); }
+  .pocket.foto .fa-btn, .pocket.foto .info-btn { background: rgba(0,0,0,.55); border-color: rgba(255,255,255,.6); color: #fff; }
+  .pocket .fa-btn[aria-pressed="true"] { background: var(--foil); border-color: transparent; color: #101A2E; font-weight: 700; text-shadow: none; }
+  .empty { padding: 28px 16px; text-align: center; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); }
+  .fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom,0px)); display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 22px 0 18px; border: 0; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 16px; box-shadow: 0 6px 20px rgba(0,0,0,.28); z-index: 5; }
+  .fab svg { width: 22px; height: 22px; }
+
+  /* hojas inferiores */
+  .modal { position: fixed; inset: 0; z-index: 20; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; }
+  .card { width: 100%; max-width: 600px; max-height: 94%; overflow-y: auto; background: var(--bg); border-radius: 18px 18px 0 0; padding: 18px max(16px,env(safe-area-inset-left,0px)) calc(18px + env(safe-area-inset-bottom,0px)); display: flex; flex-direction: column; gap: 14px; }
+  .card-head { display: flex; align-items: center; gap: 12px; }
+  .card-head h2 { margin: 0; font: 800 24px var(--font-display); min-width: 0; overflow-wrap: anywhere; }
+  .card-head .iconbtn { margin-left: auto; }
+  .help { margin: 0; color: var(--muted); font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 700; position: relative; }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.small { height: 38px; padding: 0 14px; font-size: 14px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+  .field span { font: 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .field input, .field select { height: 42px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 0 12px; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; }
+  .toggle input { width: 22px; height: 22px; accent-color: var(--accent); }
+  .mycard { display: flex; gap: 12px; align-items: flex-start; }
+  .mycard img { width: 110px; aspect-ratio: 63/88; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); flex: none; background: var(--surface); }
+  .mycard .ph { width: 110px; aspect-ratio: 63/88; border: 1.5px dashed var(--line); border-radius: 8px; flex: none; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; padding: 6px; }
+  .mycard .col { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+  .versions { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px,1fr)); gap: 10px; }
+  .ver { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+  .ver img { width: 100%; aspect-ratio: 63/88; object-fit: cover; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
+  .ver b { font-weight: 700; }
+  .ver .pr { font: 12px var(--font-mono); }
+  .ver.best img { outline: 2px solid var(--accent); }
+  h3 { margin: 0; font: 800 17px var(--font-display); }
+  .status { min-height: 22px; font-size: 14px; }
+  .cands { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cand { height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); font-weight: 700; }
+  .cand[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .scan-prev { max-height: 160px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); align-self: flex-start; }
+  .camwrap { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; }
+  .camwrap video { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
+  .guide { position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%); height: min(70%, 78vw * 88 / 63); aspect-ratio: 63/88; border: 2px solid rgba(255,255,255,.85); border-radius: 12px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.35); pointer-events: none; }
+  .camhint { position: absolute; top: calc(12px + env(safe-area-inset-top,0px)); left: 0; right: 0; text-align: center; color: #fff; font-size: 14px; text-shadow: 0 1px 3px #000; }
+  .camctl { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 16px 16px calc(16px + env(safe-area-inset-bottom,0px)); background: #000; }
+  .shutter { width: 68px; height: 68px; border-radius: 50%; border: 4px solid #fff; background: var(--accent); }
+  .camctl .btn { background: #222; color: #fff; border-color: #444; }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(80px + env(safe-area-inset-bottom,0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 14px; z-index: 40; max-width: 90%; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <p class="eyebrow">Kanto · 151 especies · 17 hojas</p>
+        <h1>Proyecto 151</h1>
+      </div>
+      <button type="button" class="iconbtn" id="btnMenu">Copia y ajustes</button>
+    </div>
+    <div class="score" aria-live="polite"><span class="big" id="have">0</span><span class="of">/ 151</span><span class="pct" id="pct"></span></div>
+    <div class="bar" id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="151" aria-label="Progreso"><i id="barfill"></i></div>
+    <div class="stats"><span>Faltan <b id="miss">0</b></span><span>Full art <b id="fa">0</b></span><span>Con foto <b id="nfoto">0</b></span></div>
+  </header>
+
+  <section aria-label="Mapa de hojas">
+    <p class="sheetmap-title">Hojas</p>
+    <nav class="sheetmap" id="sheetmap"></nav>
+  </section>
+
+  <section class="controls" aria-label="Filtros">
+    <div class="seg" id="seg">
+      <button type="button" data-mode="all" aria-pressed="true">Todas</button>
+      <button type="button" data-mode="miss" aria-pressed="false">Faltan</button>
+      <button type="button" data-mode="have" aria-pressed="false">Tengo</button>
+      <button type="button" data-mode="fa" aria-pressed="false">Full art</button>
+    </div>
+    <input class="search" id="q" type="search" placeholder="Buscar por nombre o número" autocomplete="off" aria-label="Buscar carta">
+  </section>
+
+  <main>
+    <div class="pages" id="pages"></div>
+    <p class="empty" id="empty" hidden>Ninguna carta coincide con este filtro.</p>
+  </main>
+</div>
+
+<button type="button" class="fab" id="fab">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+  Escanear
+</button>
+
+<!-- Escáner -->
+<div class="modal" id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+  <div class="card">
+    <div class="card-head"><h2 id="scanTitle">Escanear carta</h2><button type="button" class="iconbtn" id="scanClose">Cerrar</button></div>
+    <p class="help">Encuadra una carta, de una en una. Lee el nombre del Pokémon en la parte de arriba y te propone cuál es. Tú confirmas.</p>
+    <div class="row">
+      <label class="field" style="flex:none;min-width:170px"><span>Idioma de la carta</span>
+        <select id="scanLang"><option value="eng+spa">Español / Inglés</option><option value="chi_sim">Chino simplificado</option></select>
+      </label>
+    </div>
+    <div class="row">
+      <button type="button" class="btn primary" id="btnCam">Abrir cámara</button>
+      <label class="btn">Foto o galería<input id="scanFile" type="file" accept="image/*"></label>
+    </div>
+    <img class="scan-prev" id="scanPrev" alt="Foto de la carta" hidden>
+    <div class="status" id="scanStatus" role="status" aria-live="polite"></div>
+    <div id="scanPick" hidden style="display:flex;flex-direction:column;gap:12px">
+      <div class="cands" id="cands"></div>
+      <label class="field"><span>¿No es ninguna? Busca por nombre o número</span><input id="scanSearch" type="search" autocomplete="off" placeholder="Ej. Golem o 76"></label>
+      <div class="row">
+        <label class="toggle"><input type="checkbox" id="scanFa"> Full art</label>
+        <label class="field"><span>Idioma</span><select id="scanLangCard"></select></label>
+      </div>
+      <div class="row"><button type="button" class="btn primary" id="scanSave" disabled>Guardar como mía</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="camwrap" id="camwrap" hidden>
+  <video id="video" playsinline muted></video>
+  <div class="guide"></div>
+  <div class="camhint">Pon la carta dentro del marco, con el nombre bien visible</div>
+  <div class="camctl">
+    <button type="button" class="btn" id="camCancel">Cancelar</button>
+    <button type="button" class="shutter" id="shutter" aria-label="Hacer foto"></button>
+  </div>
+</div>
+
+<!-- Detalle de carta -->
+<div class="modal" id="det" hidden role="dialog" aria-modal="true" aria-labelledby="detTitle">
+  <div class="card">
+    <div class="card-head"><h2 id="detTitle"></h2><button type="button" class="iconbtn" id="detClose">Cerrar</button></div>
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="detHave"> La tengo</label>
+      <label class="toggle"><input type="checkbox" id="detFa"> Full art</label>
+    </div>
+    <div class="mycard">
+      <div id="detPhoto"></div>
+      <div class="col">
+        <label class="field"><span>Idioma</span><select id="detLang"></select></label>
+        <label class="field"><span>Set o nota</span><input id="detNote" type="text" placeholder="Ej. 151 chino, 181/151 SR" maxlength="80"></label>
+        <div class="row">
+          <label class="btn small">Poner foto<input id="detFile" type="file" accept="image/*" capture="environment"></label>
+          <button type="button" class="btn small" id="detFotoDel" hidden>Quitar foto</button>
+        </div>
+      </div>
+    </div>
+    <h3>Otras versiones</h3>
+    <p class="help">Busca en pokemontcg.io todas las cartas de este Pokémon, con precio aproximado, para ver si hay una mejor que la tuya. Cubre sobre todo sets en inglés.</p>
+    <div class="row"><button type="button" class="btn primary small" id="detSearch">Buscar versiones</button></div>
+    <div class="status" id="detStatus" role="status" aria-live="polite"></div>
+    <div class="versions" id="versions"></div>
+  </div>
+</div>
+
+<!-- Copia y ajustes -->
+<div class="modal" id="menu" hidden role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+  <div class="card">
+    <div class="card-head"><h2 id="menuTitle">Copia y ajustes</h2><button type="button" class="iconbtn" id="menuClose">Cerrar</button></div>
+    <p class="help">Tus marcas y fotos se guardan solo en este navegador. Para pasarlas a otro móvil u ordenador, descarga la copia y súbela allí.</p>
+    <div class="row">
+      <button type="button" class="btn primary" id="btnExport">Descargar copia</button>
+      <label class="btn">Cargar copia<input id="importFile" type="file" accept="application/json,.json"></label>
+    </div>
+    <label class="field"><span>Clave de pokemontcg.io (opcional)</span><input id="apiKey" type="text" autocomplete="off" placeholder="Sin clave: 1.000 consultas al día"></label>
+    <div class="status" id="menuStatus" role="status"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var DATA = [[1,"Bulbasaur"],[2,"Ivysaur"],[3,"Venusaur"],[4,"Charmander"],[5,"Charmeleon"],[6,"Charizard"],[7,"Squirtle"],[8,"Wartortle"],[9,"Blastoise"],[10,"Caterpie"],[11,"Metapod"],[12,"Butterfree"],[13,"Weedle"],[14,"Kakuna"],[15,"Beedrill"],[16,"Pidgey"],[17,"Pidgeotto"],[18,"Pidgeot"],[19,"Rattata"],[20,"Raticate"],[21,"Spearow"],[22,"Fearow"],[23,"Ekans"],[24,"Arbok"],[25,"Pikachu"],[26,"Raichu"],[27,"Sandshrew"],[28,"Sandslash"],[29,"Nidoran♀"],[30,"Nidorina"],[31,"Nidoqueen"],[32,"Nidoran♂"],[33,"Nidorino"],[34,"Nidoking"],[35,"Clefairy"],[36,"Clefable"],[37,"Vulpix"],[38,"Ninetales"],[39,"Jigglypuff"],[40,"Wigglytuff"],[41,"Zubat"],[42,"Golbat"],[43,"Oddish"],[44,"Gloom"],[45,"Vileplume"],[46,"Paras"],[47,"Parasect"],[48,"Venonat"],[49,"Venomoth"],[50,"Diglett"],[51,"Dugtrio"],[52,"Meowth"],[53,"Persian"],[54,"Psyduck"],[55,"Golduck"],[56,"Mankey"],[57,"Primeape"],[58,"Growlithe"],[59,"Arcanine"],[60,"Poliwag"],[61,"Poliwhirl"],[62,"Poliwrath"],[63,"Abra"],[64,"Kadabra"],[65,"Alakazam"],[66,"Machop"],[67,"Machoke"],[68,"Machamp"],[69,"Bellsprout"],[70,"Weepinbell"],[71,"Victreebel"],[72,"Tentacool"],[73,"Tentacruel"],[74,"Geodude"],[75,"Graveler"],[76,"Golem"],[77,"Ponyta"],[78,"Rapidash"],[79,"Slowpoke"],[80,"Slowbro"],[81,"Magnemite"],[82,"Magneton"],[83,"Farfetch’d"],[84,"Doduo"],[85,"Dodrio"],[86,"Seel"],[87,"Dewgong"],[88,"Grimer"],[89,"Muk"],[90,"Shellder"],[91,"Cloyster"],[92,"Gastly"],[93,"Haunter"],[94,"Gengar"],[95,"Onix"],[96,"Drowzee"],[97,"Hypno"],[98,"Krabby"],[99,"Kingler"],[100,"Voltorb"],[101,"Electrode"],[102,"Exeggcute"],[103,"Exeggutor"],[104,"Cubone"],[105,"Marowak"],[106,"Hitmonlee"],[107,"Hitmonchan"],[108,"Lickitung"],[109,"Koffing"],[110,"Weezing"],[111,"Rhyhorn"],[112,"Rhydon"],[113,"Chansey"],[114,"Tangela"],[115,"Kangaskhan"],[116,"Horsea"],[117,"Seadra"],[118,"Goldeen"],[119,"Seaking"],[120,"Staryu"],[121,"Starmie"],[122,"Mr. Mime"],[123,"Scyther"],[124,"Jynx"],[125,"Electabuzz"],[126,"Magmar"],[127,"Pinsir"],[128,"Tauros"],[129,"Magikarp"],[130,"Gyarados"],[131,"Lapras"],[132,"Ditto"],[133,"Eevee"],[134,"Vaporeon"],[135,"Jolteon"],[136,"Flareon"],[137,"Porygon"],[138,"Omanyte"],[139,"Omastar"],[140,"Kabuto"],[141,"Kabutops"],[142,"Aerodactyl"],[143,"Snorlax"],[144,"Articuno"],[145,"Zapdos"],[146,"Moltres"],[147,"Dratini"],[148,"Dragonair"],[149,"Dragonite"],[150,"Mewtwo"],[151,"Mew"]];
+  var ZH = ["妙蛙种子","妙蛙草","妙蛙花","小火龙","火恐龙","喷火龙","杰尼龟","卡咪龟","水箭龟","绿毛虫","铁甲蛹","巴大蝶","独角虫","铁壳蛹","大针蜂","波波","比比鸟","大比鸟","小拉达","拉达","烈雀","大嘴雀","阿柏蛇","阿柏怪","皮卡丘","雷丘","穿山鼠","穿山王","尼多兰","尼多娜","尼多后","尼多朗","尼多力诺","尼多王","皮皮","皮可西","六尾","九尾","胖丁","胖可丁","超音蝠","大嘴蝠","走路草","臭臭花","霸王花","派拉斯","派拉斯特","毛球","摩鲁蛾","地鼠","三地鼠","喵喵","猫老大","可达鸭","哥达鸭","猴怪","火暴猴","卡蒂狗","风速狗","蚊香蝌蚪","蚊香君","蚊香泳士","凯西","勇基拉","胡地","腕力","豪力","怪力","喇叭芽","口呆花","大食花","玛瑙水母","毒刺水母","小拳石","隆隆石","隆隆岩","小火马","烈焰马","呆呆兽","呆壳兽","小磁怪","三合一磁怪","大葱鸭","嘟嘟","嘟嘟利","小海狮","白海狮","臭泥","臭臭泥","大舌贝","刺甲贝","鬼斯","鬼斯通","耿鬼","大岩蛇","催眠貘","引梦貘人","大钳蟹","巨钳蟹","霹雳电球","顽皮雷弹","蛋蛋","椰蛋树","卡拉卡拉","嘎啦嘎啦","飞腿郎","快拳郎","大舌头","瓦斯弹","双弹瓦斯","独角犀牛","钻角犀兽","吉利蛋","蔓藤怪","袋兽","墨海马","海刺龙","角金鱼","金鱼王","海星星","宝石海星","魔墙人偶","飞天螳螂","迷唇姐","电击兽","鸭嘴火兽","凯罗斯","肯泰罗","鲤鱼王","暴鲤龙","拉普拉斯","百变怪","伊布","水伊布","雷伊布","火伊布","多边兽","菊石兽","多刺菊石兽","化石盔","镰刀盔","化石翼龙","卡比兽","急冻鸟","闪电鸟","火焰鸟","迷你龙","哈克龙","快龙","超梦","梦幻"];
+  var SEED_HAVE = [4, 5, 15, 18, 20, 21, 23, 24, 25, 27, 33, 36, 37, 38, 39, 40, 42, 43, 44, 45, 54, 55, 58, 60, 62, 63, 64, 65, 73, 76, 77, 78, 80, 81, 82, 86, 87, 88, 92, 93, 94, 95, 100, 101, 102, 103, 108, 109, 113, 114, 115, 119, 120, 121, 125, 127, 128, 129, 133, 137, 146];
+  var SEED_FA = [18, 20, 24, 73, 76, 80, 103];
+  var TOTAL = DATA.length, PER_PAGE = 9, PAGES = Math.ceil(TOTAL / PER_PAGE);
+  var LANGS = ['Español', 'Inglés', 'Chino simplificado', 'Japonés', 'Otro'];
+  var KEY = 'proyecto151.v2', FOTO = 'proyecto151.foto.', APIKEY = 'proyecto151.apikey';
+
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return String(n).padStart(3, '0'); }
+  function norm(s) { return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function letters(s) { return norm(s).replace(/[^a-z0-9]/g, ''); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function nameOf(n) { return DATA[n - 1][1]; }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function toast(t) {
+    var d = el('div', 'toast', t); document.body.appendChild(d);
+    setTimeout(function () { d.remove(); }, 2600);
+  }
+
+  /* ---------- estado ---------- */
+  var have = new Set(SEED_HAVE), fa = new Set(SEED_FA), info = {};
+  var fotos = {};
+  (function load() {
+    var raw = lsGet(KEY);
+    if (raw) {
+      try {
+        var s = JSON.parse(raw);
+        have = new Set(s.have || []); fa = new Set(s.fa || []); info = s.info || {};
+      } catch (e) {}
+    }
+    for (var n = 1; n <= TOTAL; n++) { var f = lsGet(FOTO + n); if (f) fotos[n] = f; }
+  })();
+  function save() {
+    var ok = lsSet(KEY, JSON.stringify({ have: Array.from(have).sort(function (a, b) { return a - b; }), fa: Array.from(fa).sort(function (a, b) { return a - b; }), info: info }));
+    if (!ok) toast('No se pudo guardar en este navegador');
+  }
+  function setFoto(n, data) {
+    if (data) {
+      if (lsSet(FOTO + n, data)) fotos[n] = data; else toast('No hay espacio para más fotos');
+    } else { lsDel(FOTO + n); delete fotos[n]; }
+  }
+
+  /* ---------- hojas ---------- */
+  var mode = 'all', query = '';
+  var pagesEl = $('pages'), pockets = {}, sheets = [], mapBtns = [];
+  for (var p = 0; p < PAGES; p++) {
+    var sec = el('section', 'sheet'); sec.id = 'hoja-' + (p + 1);
+    var first = p * PER_PAGE + 1, last = Math.min(TOTAL, first + PER_PAGE - 1);
+    var head = el('div', 'sheet-head');
+    head.appendChild(el('h2', null, 'Hoja ' + (p + 1)));
+    head.appendChild(el('span', 'rng', pad(first) + '–' + pad(last)));
+    var cnt = el('span', 'cnt'); head.appendChild(cnt); sec.appendChild(head);
+    var grid = el('div', 'grid');
+    for (var i = 0; i < PER_PAGE; i++) {
+      var n = first + i;
+      if (n > TOTAL) { var b = el('div', 'pocket blank'); b.setAttribute('aria-hidden', 'true'); grid.appendChild(b); continue; }
+      var pk = el('div', 'pocket'); pk.dataset.n = n;
+      var slot = el('button', 'slot'); slot.type = 'button';
+      slot.appendChild(el('span', 'no', '#' + pad(n)));
+      slot.appendChild(el('span', 'nm', nameOf(n)));
+      slot.appendChild(el('span', 'sp'));
+      var ib = el('button', 'info-btn', '⋯'); ib.type = 'button'; ib.setAttribute('aria-label', 'Detalle de ' + nameOf(n));
+      var fb = el('button', 'fa-btn', 'FA'); fb.type = 'button'; fb.setAttribute('aria-label', 'Full art de ' + nameOf(n));
+      pk.appendChild(slot); pk.appendChild(ib); pk.appendChild(fb);
+      grid.appendChild(pk); pockets[n] = pk;
+    }
+    sec.appendChild(grid); pagesEl.appendChild(sec);
+    sheets.push({ sec: sec, cnt: cnt, first: first, last: last });
+  }
+  sheets.forEach(function (s, idx) {
+    var b = el('button', null, String(idx + 1)); b.type = 'button'; b.setAttribute('aria-label', 'Ir a la hoja ' + (idx + 1));
+    b.appendChild(el('i'));
+    b.addEventListener('click', function () { s.sec.hidden = false; s.sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    $('sheetmap').appendChild(b); mapBtns.push(b);
+  });
+
+  function matches(n) {
+    var own = have.has(n);
+    if (mode === 'miss' && own) return false;
+    if (mode === 'have' && !own) return false;
+    if (mode === 'fa' && !fa.has(n)) return false;
+    if (query) {
+      var q = norm(query).replace('#', '');
+      if (norm(nameOf(n)).indexOf(q) === -1 && pad(n).indexOf(q) !== 0 && String(n) !== q) return false;
+    }
+    return true;
+  }
+
+  function refresh() {
+    var vis = 0, pv = new Array(PAGES).fill(0), po = new Array(PAGES).fill(0), nf = 0;
+    for (var n = 1; n <= TOTAL; n++) {
+      var pk = pockets[n], own = have.has(n), pg = Math.floor((n - 1) / PER_PAGE);
+      pk.classList.toggle('own', own);
+      pk.classList.toggle('fa', fa.has(n));
+      var f = own && fotos[n];
+      pk.classList.toggle('foto', !!f);
+      var slot = pk.firstChild;
+      slot.style.backgroundImage = f ? 'linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,0) 35%, rgba(0,0,0,0) 60%, rgba(0,0,0,.6)), url("' + fotos[n] + '")' : '';
+      slot.setAttribute('aria-pressed', own ? 'true' : 'false');
+      slot.setAttribute('aria-label', '#' + pad(n) + ' ' + nameOf(n) + ', ' + (own ? 'la tengo' : 'me falta'));
+      pk.lastChild.setAttribute('aria-pressed', fa.has(n) ? 'true' : 'false');
+      if (own) po[pg]++;
+      if (fotos[n]) nf++;
+      var show = matches(n); pk.hidden = !show;
+      if (show) { pv[pg]++; vis++; }
+    }
+    sheets.forEach(function (s, idx) {
+      var tot = s.last - s.first + 1;
+      s.sec.hidden = pv[idx] === 0;
+      s.cnt.textContent = po[idx] + '/' + tot;
+      mapBtns[idx].lastChild.style.width = Math.round(po[idx] / tot * 100) + '%';
+      mapBtns[idx].classList.toggle('done', po[idx] === tot);
+    });
+    var c = have.size;
+    $('have').textContent = c; $('pct').textContent = Math.round(c / TOTAL * 100) + ' %';
+    $('miss').textContent = TOTAL - c; $('fa').textContent = fa.size; $('nfoto').textContent = nf;
+    $('barfill').style.width = (c / TOTAL * 100) + '%'; $('bar').setAttribute('aria-valuenow', c);
+    document.querySelectorAll('#seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.mode === mode ? 'true' : 'false'); });
+    $('empty').hidden = vis !== 0;
+  }
+
+  pagesEl.addEventListener('click', function (e) {
+    var pk = e.target.closest('.pocket');
+    if (!pk || !pk.dataset.n) return;
+    var n = Number(pk.dataset.n);
+    if (e.target.closest('.info-btn')) { openDetail(n); return; }
+    if (e.target.closest('.fa-btn')) { if (fa.has(n)) fa.delete(n); else { fa.add(n); have.add(n); } }
+    else if (e.target.closest('.slot')) { if (have.has(n)) { have.delete(n); fa.delete(n); } else have.add(n); }
+    else return;
+    save(); refresh();
+  });
+  $('seg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; mode = b.dataset.mode; refresh(); });
+  $('q').addEventListener('input', function (e) { query = e.target.value.trim(); refresh(); });
+
+  /* ---------- hojas modales ---------- */
+  var lastFocus = null;
+  function openModal(m) { lastFocus = document.activeElement; m.hidden = false; }
+  function closeModal(m) { m.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!$('camwrap').hidden) { closeCam(); return; }
+    ['scan', 'det', 'menu'].forEach(function (id) { if (!$(id).hidden) { if (id === 'scan') closeScan(); else closeModal($(id)); } });
+  });
+  ['scan', 'det', 'menu'].forEach(function (id) {
+    $(id).addEventListener('click', function (e) { if (e.target === $(id)) { if (id === 'scan') closeScan(); else closeModal($(id)); } });
+  });
+  function fillLangSelect(sel, withBlank) {
+    sel.textContent = '';
+    if (withBlank) sel.appendChild(new Option('Sin indicar', ''));
+    LANGS.forEach(function (l) { sel.appendChild(new Option(l, l)); });
+  }
+  fillLangSelect($('detLang'), true);
+  fillLangSelect($('scanLangCard'), false);
+
+  /* ---------- imagen ---------- */
+  function loadBitmap(file) {
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function () { return viaImg(file); });
+    }
+    return viaImg(file);
+  }
+  function viaImg(file) {
+    return new Promise(function (res, rej) {
+      var u = URL.createObjectURL(file), im = new Image();
+      im.onload = function () { res(im); URL.revokeObjectURL(u); };
+      im.onerror = function () { rej(new Error('img')); URL.revokeObjectURL(u); };
+      im.src = u;
+    });
+  }
+  function toCanvas(src, maxSide) {
+    var w = src.width || src.videoWidth, h = src.height || src.videoHeight;
+    var k = Math.min(1, maxSide / Math.max(w, h));
+    var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    return c;
+  }
+  function thumbOf(canvas) {
+    var w = 240, h = Math.round(canvas.height * w / canvas.width);
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(canvas, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.62);
+  }
+  function cropTop(canvas, frac) {
+    var h = Math.round(canvas.height * frac);
+    var c = document.createElement('canvas'); c.width = canvas.width; c.height = h;
+    c.getContext('2d').drawImage(canvas, 0, 0, canvas.width, h, 0, 0, canvas.width, h);
+    return c;
+  }
+
+  /* ---------- detalle ---------- */
+  var detN = 0;
+  function renderDetPhoto() {
+    var box = $('detPhoto'); box.textContent = '';
+    if (fotos[detN]) { var im = el('img'); im.src = fotos[detN]; im.alt = 'Mi carta de ' + nameOf(detN); box.appendChild(im); }
+    else box.appendChild(el('div', 'ph', 'Sin foto de tu carta'));
+    $('detFotoDel').hidden = !fotos[detN];
+  }
+  function openDetail(n) {
+    detN = n;
+    $('detTitle').textContent = '#' + pad(n) + ' ' + nameOf(n);
+    $('detHave').checked = have.has(n); $('detFa').checked = fa.has(n);
+    var i = info[n] || {};
+    $('detLang').value = i.lang || ''; $('detNote').value = i.nota || '';
+    $('detStatus').textContent = ''; $('versions').textContent = '';
+    renderDetPhoto(); openModal($('det'));
+  }
+  $('detClose').addEventListener('click', function () { closeModal($('det')); });
+  $('detHave').addEventListener('change', function (e) {
+    if (e.target.checked) have.add(detN); else { have.delete(detN); fa.delete(detN); $('detFa').checked = false; }
+    save(); refresh();
+  });
+  $('detFa').addEventListener('change', function (e) {
+    if (e.target.checked) { fa.add(detN); have.add(detN); $('detHave').checked = true; } else fa.delete(detN);
+    save(); refresh();
+  });
+  function saveInfo() {
+    info[detN] = { lang: $('detLang').value, nota: $('detNote').value.trim() };
+    if (!info[detN].lang && !info[detN].nota) delete info[detN];
+    save();
+  }
+  $('detLang').addEventListener('change', saveInfo);
+  $('detNote').addEventListener('change', saveInfo);
+  $('detFile').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    loadBitmap(f).then(function (bm) {
+      setFoto(detN, thumbOf(toCanvas(bm, 900)));
+      have.add(detN); $('detHave').checked = true;
+      save(); renderDetPhoto(); refresh();
+    }).catch(function () { toast('No se pudo leer esa foto'); });
+    e.target.value = '';
+  });
+  $('detFotoDel').addEventListener('click', function () { setFoto(detN, null); renderDetPhoto(); refresh(); });
+
+  function price(c) {
+    var cm = c.cardmarket && c.cardmarket.prices;
+    if (cm && cm.trendPrice != null) return { v: cm.trendPrice, t: cm.trendPrice.toFixed(2) + ' €' };
+    var tp = c.tcgplayer && c.tcgplayer.prices;
+    if (tp) {
+      var keys = Object.keys(tp);
+      for (var i = 0; i < keys.length; i++) { var m = tp[keys[i]]; if (m && m.market != null) return { v: m.market * 0.92, t: m.market.toFixed(2) + ' $' }; }
+    }
+    return { v: -1, t: 'sin precio' };
+  }
+  $('detSearch').addEventListener('click', function () {
+    var n = detN, st = $('detStatus'), out = $('versions');
+    out.textContent = ''; st.textContent = 'Buscando…';
+    var headers = {}; var key = lsGet(APIKEY); if (key) headers['X-Api-Key'] = key;
+    var url = 'https://api.pokemontcg.io/v2/cards?q=' + encodeURIComponent('nationalPokedexNumbers:' + n) +
+      '&orderBy=-set.releaseDate&pageSize=60&select=id,name,rarity,images,set,cardmarket,tcgplayer';
+    fetch(url, { headers: headers }).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (n !== detN) return;
+      var cards = (j.data || []).map(function (c) { return { c: c, p: price(c) }; });
+      if (!cards.length) { st.textContent = 'No he encontrado cartas de este Pokémon.'; return; }
+      var best = cards.reduce(function (a, b) { return b.p.v > a.p.v ? b : a; }, cards[0]);
+      st.textContent = cards.length + ' versiones. Precios orientativos (Cardmarket en €, o TCGplayer en $).';
+      cards.forEach(function (o) {
+        var d = el('div', 'ver' + (o === best && best.p.v > 0 ? ' best' : ''));
+        var im = el('img'); im.loading = 'lazy'; im.alt = o.c.name + ' ' + (o.c.set ? o.c.set.name : '');
+        im.src = o.c.images && o.c.images.small || ''; d.appendChild(im);
+        d.appendChild(el('b', null, o.c.name));
+        d.appendChild(el('span', null, (o.c.set ? o.c.set.name : '') + (o.c.rarity ? ' · ' + o.c.rarity : '')));
+        d.appendChild(el('span', 'pr', o.p.t));
+        out.appendChild(d);
+      });
+    }).catch(function () {
+      st.textContent = 'No he podido consultar pokemontcg.io. Revisa la conexión o inténtalo más tarde.';
+    });
+  });
+
+  /* ---------- copia y ajustes ---------- */
+  $('btnMenu').addEventListener('click', function () { $('apiKey').value = lsGet(APIKEY) || ''; $('menuStatus').textContent = ''; openModal($('menu')); });
+  $('menuClose').addEventListener('click', function () { closeModal($('menu')); });
+  $('apiKey').addEventListener('change', function (e) { var v = e.target.value.trim(); if (v) lsSet(APIKEY, v); else lsDel(APIKEY); $('menuStatus').textContent = 'Clave guardada en este navegador.'; });
+  $('btnExport').addEventListener('click', function () {
+    var data = { version: 2, have: Array.from(have), fa: Array.from(fa), info: info, fotos: fotos, fecha: new Date().toISOString() };
+    var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'proyecto-151-copia.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    $('menuStatus').textContent = 'Copia descargada.';
+  });
+  $('importFile').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      var s = JSON.parse(t);
+      if (!Array.isArray(s.have)) throw new Error('formato');
+      have = new Set(s.have.map(Number)); fa = new Set((s.fa || []).map(Number)); info = s.info || {};
+      for (var n = 1; n <= TOTAL; n++) lsDel(FOTO + n);
+      fotos = {};
+      Object.keys(s.fotos || {}).forEach(function (k) { setFoto(Number(k), s.fotos[k]); });
+      save(); refresh();
+      $('menuStatus').textContent = 'Copia cargada: ' + have.size + ' cartas.';
+    }).catch(function () { $('menuStatus').textContent = 'Ese archivo no es una copia válida.'; });
+    e.target.value = '';
+  });
+
+  /* ---------- escáner ---------- */
+  var stream = null, worker = null, workerLang = '', scanCanvas = null, picked = 0;
+
+  function lev(a, b) {
+    var m = a.length, n = b.length, d = [], i, j;
+    for (i = 0; i <= m; i++) { d[i] = [i]; }
+    for (j = 1; j <= n; j++) d[0][j] = j;
+    for (i = 1; i <= m; i++) for (j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[m][n];
+  }
+  var NAMES_L = DATA.map(function (d) { return letters(d[1]); });
+
+  function findCandidates(text, lang) {
+    var res = {};
+    function add(n, score) { if (res[n] == null || score < res[n]) res[n] = score; }
+    if (lang === 'chi_sim') {
+      var t = text.replace(/\s+/g, '');
+      ZH.forEach(function (z, i) { if (z && t.indexOf(z) !== -1) add(i + 1, -z.length); });
+    } else {
+      var words = norm(text).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 3; });
+      words.forEach(function (w) {
+        NAMES_L.forEach(function (nm, i) {
+          if (w === nm) add(i + 1, 0);
+          else if (w.length >= 5 && nm.length >= 5) {
+            var d = lev(w, nm), lim = nm.length >= 8 ? 2 : 1;
+            if (d <= lim) add(i + 1, d);
+          }
+        });
+      });
+      if (!Object.keys(res).length) {
+        var joined = letters(text);
+        NAMES_L.forEach(function (nm, i) { if (nm.length >= 6 && joined.indexOf(nm) !== -1) add(i + 1, 1.5); });
+      }
+    }
+    return Object.keys(res).map(Number).sort(function (a, b) { return res[a] - res[b]; }).slice(0, 5);
+  }
+
+  function getWorker(lang, onProgress) {
+    if (worker && workerLang === lang) return Promise.resolve(worker);
+    var p = worker ? worker.terminate() : Promise.resolve();
+    return Promise.resolve(p).then(function () {
+      return Tesseract.createWorker(lang, 1, { logger: function (m) { if (onProgress) onProgress(m); } });
+    }).then(function (w) { worker = w; workerLang = lang; return w; });
+  }
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+      s.onload = res; s.onerror = function () { rej(new Error('tesseract')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function setScanStatus(t) { $('scanStatus').textContent = t; }
+
+  function showPick(cands) {
+    $('scanPick').hidden = false;
+    var box = $('cands'); box.textContent = '';
+    cands.forEach(function (n) { addCandBtn(n, false); });
+    if (cands.length) selectCand(cands[0]); else { picked = 0; $('scanSave').disabled = true; }
+    $('scanFa').checked = false;
+    $('scanLangCard').value = $('scanLang').value === 'chi_sim' ? 'Chino simplificado' : 'Español';
+  }
+  function addCandBtn(n) {
+    var b = el('button', 'cand', '#' + pad(n) + ' ' + nameOf(n)); b.type = 'button';
+    b.dataset.n = n; b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', function () { selectCand(n); });
+    $('cands').appendChild(b);
+  }
+  function selectCand(n) {
+    picked = n;
+    var found = false;
+    document.querySelectorAll('#cands .cand').forEach(function (b) {
+      var on = Number(b.dataset.n) === n; if (on) found = true;
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    if (!found) addCandBtn(n), selectCand(n);
+    $('scanSave').disabled = !picked;
+    $('scanFa').checked = fa.has(n);
+  }
+  $('scanSearch').addEventListener('input', function (e) {
+    var q = norm(e.target.value.trim()).replace('#', '');
+    if (q.length < 2 && !/^\d+$/.test(q)) return;
+    var hit = 0;
+    for (var n = 1; n <= TOTAL; n++) {
+      if (norm(nameOf(n)).indexOf(q) === 0 || String(n) === q || pad(n) === q) { hit = n; break; }
+    }
+    if (hit) selectCand(hit);
+  });
+
+  function runOcr(canvas) {
+    var lang = $('scanLang').value;
+    $('scanPick').hidden = true;
+    scanCanvas = canvas;
+    $('scanPrev').src = canvas.toDataURL('image/jpeg', 0.5); $('scanPrev').hidden = false;
+    setScanStatus('Cargando el lector de texto (la primera vez tarda unos segundos)…');
+    loadTesseract().then(function () {
+      return getWorker(lang, function (m) {
+        if (m && m.status === 'recognizing text') setScanStatus('Leyendo la carta… ' + Math.round((m.progress || 0) * 100) + ' %');
+      });
+    }).then(function (w) {
+      var top = cropTop(canvas, 0.4);
+      return w.recognize(top).then(function (r) {
+        var c = findCandidates(r.data.text, lang);
+        if (c.length) return c;
+        setScanStatus('Probando con la carta entera…');
+        return w.recognize(canvas).then(function (r2) { return findCandidates(r2.data.text, lang); });
+      });
+    }).then(function (cands) {
+      setScanStatus(cands.length ? 'Esto es lo que parece. Elige la correcta y guarda.' : 'No he reconocido el nombre. Búscalo abajo o haz otra foto más cerca y con luz.');
+      showPick(cands);
+    }).catch(function () {
+      setScanStatus('No he podido cargar el lector de texto. Comprueba la conexión. Puedes buscar el Pokémon a mano abajo.');
+      showPick([]);
+    });
+  }
+
+  function openScan() {
+    openModal($('scan'));
+    $('scanPrev').hidden = true; $('scanPick').hidden = true; setScanStatus('');
+  }
+  function closeScan() { closeCam(); closeModal($('scan')); }
+  $('fab').addEventListener('click', openScan);
+  $('scanClose').addEventListener('click', closeScan);
+
+  $('scanFile').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    loadBitmap(f).then(function (bm) { runOcr(toCanvas(bm, 1600)); }).catch(function () { setScanStatus('No se pudo leer esa foto.'); });
+    e.target.value = '';
+  });
+
+  function openCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setScanStatus('Este navegador no permite abrir la cámara. Usa "Foto o galería".'); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+      stream = s; var v = $('video'); v.srcObject = s;
+      return v.play();
+    }).then(function () { $('camwrap').hidden = false; }).catch(function () {
+      closeCam();
+      setScanStatus('No he podido abrir la cámara. Revisa el permiso del navegador o usa "Foto o galería".');
+    });
+  }
+  function closeCam() {
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+    $('video').srcObject = null; $('camwrap').hidden = true;
+  }
+  $('btnCam').addEventListener('click', openCamera);
+  $('camCancel').addEventListener('click', closeCam);
+  $('shutter').addEventListener('click', function () {
+    var v = $('video'); if (!v.videoWidth) return;
+    var full = toCanvas(v, 1600);
+    closeCam(); runOcr(full);
+  });
+
+  $('scanSave').addEventListener('click', function () {
+    if (!picked || !scanCanvas) return;
+    var n = picked;
+    have.add(n);
+    if ($('scanFa').checked) fa.add(n);
+    info[n] = Object.assign({}, info[n], { lang: $('scanLangCard').value });
+    setFoto(n, thumbOf(scanCanvas));
+    save(); refresh();
+    toast('#' + pad(n) + ' ' + nameOf(n) + ' guardada');
+    $('scanPick').hidden = true; $('scanPrev').hidden = true;
+    setScanStatus('Guardada. Ya puedes escanear otra.');
+    scanCanvas = null; picked = 0;
+  });
+
+  refresh();
+})();
+</script>
+</body>
+</html>
