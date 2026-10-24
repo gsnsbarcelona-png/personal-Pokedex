@@ -74,7 +74,7 @@
   .pocket.own.fa .slot { border: 2px solid transparent; background: linear-gradient(var(--own-bg),var(--own-bg)) padding-box, var(--foil) border-box; }
   .pocket.foto .slot { background-size: 100% 100%; background-position: center; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
   .pocket.foto .slot .no { color: #fff; }
-  .pocket.own.fa.foto .slot { border: 2px solid #F6C445; }
+  .pocket.own.fa.foto .slot { border: 2px solid #F6C445; background-size: 100% 100%; background-position: center; background-repeat: no-repeat; background-origin: border-box; background-clip: border-box; }
   .fa-btn, .info-btn { position: absolute; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); font: 10px var(--font-mono); letter-spacing: .04em; padding: 0 5px; }
   .fa-btn { right: 6px; bottom: 6px; min-width: 30px; }
   .info-btn { right: 6px; top: 6px; min-width: 24px; }
@@ -130,7 +130,7 @@
   <header>
     <div class="top">
       <div>
-        <p class="eyebrow">Kanto · 151 especies · 17 hojas</p>
+        <p class="eyebrow">Kanto · 151 especies · 17 hojas · v3</p>
         <h1>Proyecto 151</h1>
       </div>
       <button type="button" class="iconbtn" id="btnMenu">Copia y ajustes</button>
@@ -670,9 +670,9 @@
     if (hit) selectCand(hit);
   });
 
-  function enhance(c, w) {
+  function enhance(c, w, invert) {
     var o = document.createElement('canvas'); o.width = w; o.height = Math.round(c.height * w / c.width);
-    var x = o.getContext('2d'); x.filter = 'grayscale(1) contrast(1.6)'; x.drawImage(c, 0, 0, o.width, o.height);
+    var x = o.getContext('2d'); x.filter = 'grayscale(1) ' + (invert ? 'invert(1) ' : '') + 'contrast(1.6)'; x.drawImage(c, 0, 0, o.width, o.height);
     return o;
   }
   /* códigos de rareza que llevan las cartas chinas y japonesas: SAR, SR, UR... */
@@ -688,7 +688,11 @@
       return w.recognize(enhance(cropTop(canvas, 0.16), 1000)).then(function (r) {
         res.text = r.data.text; res.cands = findCandidates(r.data.text, lang);
         if (res.cands.length) return;
-        return w.recognize(cropTop(canvas, 0.4)).then(function (r2) { res.text += ' ' + r2.data.text; res.cands = findCandidates(r2.data.text, lang); });
+        return w.recognize(enhance(cropTop(canvas, 0.16), 1000, true)).then(function (ri) {
+          res.text += ' ' + ri.data.text; res.cands = findCandidates(ri.data.text, lang);
+          if (res.cands.length) return;
+          return w.recognize(cropTop(canvas, 0.4)).then(function (r2) { res.text += ' ' + r2.data.text; res.cands = findCandidates(r2.data.text, lang); });
+        });
       }).then(function () {
         if (!res.cands.length) return res;
         setScanStatus('Leyendo número y rareza…');
