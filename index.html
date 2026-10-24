@@ -127,6 +127,7 @@
   .cardinfo { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
   .ver .btn { height: 32px; font-size: 12px; padding: 0 8px; }
   .ver .df { font: 11px var(--font-mono); color: var(--muted); }
+  #cropCv { align-self: center; max-width: 100%; border-radius: 8px; touch-action: none; cursor: grab; }
   .camwrap { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; }
   .camwrap video { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
   .guide { position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%); height: min(70%, 78vw * 88 / 63); aspect-ratio: 63/88; border: 2px solid rgba(255,255,255,.85); border-radius: 12px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.35); pointer-events: none; }
@@ -206,6 +207,21 @@
         <label class="field"><span>Idioma</span><select id="scanLangCard"></select></label>
       </div>
       <div class="row"><button type="button" class="btn primary" id="scanSave" disabled>Guardar como mía</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Recorte de la carta -->
+<div class="modal" id="crop" hidden role="dialog" aria-modal="true" aria-labelledby="cropTitle" style="z-index:25">
+  <div class="card">
+    <div class="card-head"><h2 id="cropTitle">Recorta la carta</h2></div>
+    <p class="help">Arrastra el marco hasta que quede justo sobre la carta y ajusta el tamaño. Así leo bien el nombre y el número, y la foto guardada será solo la carta.</p>
+    <canvas id="cropCv"></canvas>
+    <label class="field"><span>Tamaño del marco</span><input id="cropSize" type="range" min="25" max="100" value="70"></label>
+    <div class="row">
+      <button type="button" class="btn primary" id="cropOk">Usar este recorte</button>
+      <button type="button" class="btn" id="cropFull">Foto entera</button>
+      <button type="button" class="btn" id="cropCancel">Cancelar</button>
     </div>
   </div>
 </div>
@@ -504,6 +520,47 @@
     c.getContext('2d').drawImage(canvas, 0, 0, w, h);
     return c.toDataURL('image/jpeg', 0.62);
   }
+  /* deja marcar a mano dónde está la carta (proporción 63:88) y devuelve el recorte, la foto entera o null */
+  function cropCard(src) {
+    return new Promise(function (resolve) {
+      var m = $('crop'), cv = $('cropCv'), ctx = cv.getContext('2d'), sz = $('cropSize');
+      var W = src.width, H = src.height, R = 63 / 88;
+      var k = Math.min(Math.min(window.innerWidth - 40, 560) / W, window.innerHeight * 0.5 / H);
+      cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+      var hMax = Math.min(H, W / R), cx = W / 2, cy = H / 2, drag = null;
+      sz.value = 70;
+      function dims() { var h = Number(sz.value) / 100 * hMax; return { h: h, w: h * R }; }
+      function draw() {
+        var d = dims();
+        cx = Math.min(W - d.w / 2, Math.max(d.w / 2, cx)); cy = Math.min(H - d.h / 2, Math.max(d.h / 2, cy));
+        ctx.drawImage(src, 0, 0, cv.width, cv.height);
+        var x = (cx - d.w / 2) * k, y = (cy - d.h / 2) * k, w = d.w * k, h = d.h * k;
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        ctx.fillRect(0, 0, cv.width, y); ctx.fillRect(0, y + h, cv.width, cv.height - y - h);
+        ctx.fillRect(0, y, x, h); ctx.fillRect(x + w, y, cv.width - x - w, h);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+      }
+      function done(r) { m.hidden = true; cv.onpointerdown = cv.onpointermove = cv.onpointerup = sz.oninput = null; resolve(r); }
+      cv.onpointerdown = function (e) { drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); };
+      cv.onpointermove = function (e) {
+        if (!drag) return;
+        var s = cv.width / cv.getBoundingClientRect().width;
+        cx += (e.clientX - drag.x) * s / k; cy += (e.clientY - drag.y) * s / k;
+        drag = { x: e.clientX, y: e.clientY }; draw();
+      };
+      cv.onpointerup = function () { drag = null; };
+      sz.oninput = draw;
+      $('cropOk').onclick = function () {
+        var d = dims(), c = document.createElement('canvas');
+        c.width = Math.round(d.w); c.height = Math.round(d.h);
+        c.getContext('2d').drawImage(src, cx - d.w / 2, cy - d.h / 2, d.w, d.h, 0, 0, c.width, c.height);
+        done(c);
+      };
+      $('cropFull').onclick = function () { done(src); };
+      $('cropCancel').onclick = function () { done(null); };
+      m.hidden = false; draw();
+    });
+  }
   function cropTop(canvas, frac) {
     var h = Math.round(canvas.height * frac);
     var c = document.createElement('canvas'); c.width = canvas.width; c.height = h;
@@ -577,8 +634,9 @@
   $('detNote').addEventListener('change', saveInfo);
   $('detFile').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
-    loadBitmap(f).then(function (bm) {
-      setFoto(detN, thumbOf(toCanvas(bm, 900)));
+    loadBitmap(f).then(function (bm) { return cropCard(toCanvas(bm, 1600)); }).then(function (c) {
+      if (!c) return;
+      setFoto(detN, thumbOf(c));
       have.add(detN); $('detHave').checked = true;
       save(); renderDetPhoto(); refresh();
     }).catch(function () { toast('No se pudo leer esa foto'); });
@@ -830,7 +888,7 @@
         var pc = c.length ? Promise.resolve(c) : (setScanStatus('Probando con la carta entera…'), w.recognize(canvas).then(function (r2) { return findCandidates(r2.data.text, lang); }));
         return pc.then(function (cands) {
           setScanStatus('Leyendo el número de la carta…');
-          return w.recognize(cropBottom(canvas, 0.22)).then(function (rb) {
+          return w.recognize(cropBottom(canvas, 0.16)).then(function (rb) {
             scanNum = parseNumber(rb.data.text);
             return cands;
           });
@@ -855,7 +913,7 @@
 
   $('scanFile').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
-    loadBitmap(f).then(function (bm) { runOcr(toCanvas(bm, 1600)); }).catch(function () { setScanStatus('No se pudo leer esa foto.'); });
+    loadBitmap(f).then(function (bm) { return cropCard(toCanvas(bm, 1600)); }).then(function (c) { if (c) runOcr(c); }).catch(function () { setScanStatus('No se pudo leer esa foto.'); });
     e.target.value = '';
   });
 
@@ -878,7 +936,7 @@
   $('shutter').addEventListener('click', function () {
     var v = $('video'); if (!v.videoWidth) return;
     var full = toCanvas(v, 1600);
-    closeCam(); runOcr(full);
+    closeCam(); cropCard(full).then(function (c) { if (c) runOcr(c); });
   });
 
   $('scanSave').addEventListener('click', function () {
