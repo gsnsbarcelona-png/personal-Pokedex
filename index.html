@@ -333,12 +333,19 @@
   function fromTcgdex(c, lang) {
     var cc = c.set && c.set.cardCount;
     return { src: 'tcgdex', id: c.id, lang: lang, name: c.name, number: String(c.localId || ''), set: c.set && c.set.name || '',
-      total: cc && (cc.official || cc.total) || 0, rarity: c.rarity || '', img: c.image ? c.image + '/low.webp' : '', eur: tcgdexEur(c), upd: new Date().toISOString().slice(0, 10) };
+      total: cc && (cc.official || cc.total) || 0, rarity: c.rarity || '', img: c.image ? c.image + '/low.webp' : '', dex: c.dexId, eur: tcgdexEur(c), upd: new Date().toISOString().slice(0, 10) };
   }
   function fromPtcg(c) {
     var p = price(c);
     return { src: 'ptcg', id: c.id, lang: 'en', name: c.name, number: String(c.number || ''), set: c.set && c.set.name || '',
-      total: c.set && c.set.printedTotal || 0, rarity: c.rarity || '', img: c.images && c.images.small || '', eur: p.v, upd: new Date().toISOString().slice(0, 10) };
+      total: c.set && c.set.printedTotal || 0, rarity: c.rarity || '', img: c.images && c.images.small || '', dex: c.nationalPokedexNumbers, eur: p.v, upd: new Date().toISOString().slice(0, 10) };
+  }
+  /* solo cartas de ese Pokémon: nada de Mewtwo al pedir Mew, ni cartas de varios Pokémon */
+  function isMon(c, n) {
+    if (c.dex && c.dex.length) return c.dex.length === 1 && Number(c.dex[0]) === n;
+    if (c.lang === 'zh-cn') return c.name.indexOf(ZH[n - 1]) !== -1;
+    var t = letters(c.name), nm = letters(nameOf(n));
+    return t.indexOf(nm) !== -1 && (nm !== 'mew' || t.indexOf('mewtwo') === -1);
   }
   function tcgdexDetail(id, lang) { return jget(TCGDEX + lang + '/cards/' + encodeURIComponent(id)).then(function (c) { return fromTcgdex(c, lang); }); }
   /* cartas de un Pokémon en TCGdex (lista breve); si el idioma no tiene ninguna, prueba en inglés */
@@ -659,9 +666,11 @@
     out.textContent = ''; st.textContent = 'Buscando…';
     var headers = {}; var key = lsGet(APIKEY); if (key) headers['X-Api-Key'] = key;
     var url = 'https://api.pokemontcg.io/v2/cards?q=' + encodeURIComponent('nationalPokedexNumbers:' + n) +
-      '&orderBy=-set.releaseDate&pageSize=60&select=id,name,rarity,images,set,cardmarket,tcgplayer';
+      '&orderBy=-set.releaseDate&pageSize=60&select=id,name,rarity,images,set,cardmarket,tcgplayer,nationalPokedexNumbers';
     function show(cards) {
       if (n !== detN) return;
+      if (!cards.length) { st.textContent = 'No he encontrado cartas de este Pokémon.'; return; }
+      cards = cards.filter(function (c) { return isMon(c, n); });
       if (!cards.length) { st.textContent = 'No he encontrado cartas de este Pokémon.'; return; }
       cards.sort(function (a, b) { return b.eur - a.eur; });
       var mine = info[n] && info[n].card, mineEur = mine && mine.eur > 0 ? mine.eur : null;
@@ -809,7 +818,7 @@
       var chosen = (hit.length ? hit : list).slice(0, 12);
       return pool(chosen, 6, function (c) { return tcgdexDetail(c.id, r.lang); }).then(function (cs) {
         if (tok !== choiceTok) return;
-        cs = cs.filter(Boolean);
+        cs = cs.filter(function (c) { return c && isMon(c, n); });
         if (scanNum && scanNum.total) cs.sort(function (a, b) { return (b.total === scanNum.total) - (a.total === scanNum.total); });
         if (!cs.length) { st.textContent = 'No he encontrado cartas de ' + nameOf(n) + ' en este idioma. Prueba con otro idioma o guarda solo con tu foto.'; return; }
         st.textContent = (hit.length ? 'Coincide con el número ' + scanNum.num + (scanNum.total ? '/' + scanNum.total : '') + '. ' : (scanNum ? 'No he encontrado el número ' + scanNum.num + '; estas son otras cartas. ' : 'No he leído el número; ')) + 'Elige la tuya (o ninguna):';
