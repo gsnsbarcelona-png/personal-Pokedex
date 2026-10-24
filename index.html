@@ -119,6 +119,14 @@
   .cand { height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); font-weight: 700; }
   .cand[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
   .scan-prev { max-height: 160px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); align-self: flex-start; }
+  .cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 8px; }
+  .cc { display: flex; flex-direction: column; gap: 3px; padding: 4px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--surface); text-align: left; font-size: 11px; line-height: 1.25; }
+  .cc img { width: 100%; aspect-ratio: 63/88; object-fit: cover; border-radius: 5px; background: var(--bg); }
+  .cc[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .cc .pr, .ver .pr { font: 12px var(--font-mono); }
+  .cardinfo { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+  .ver .btn { height: 32px; font-size: 12px; padding: 0 8px; }
+  .ver .df { font: 11px var(--font-mono); color: var(--muted); }
   .camwrap { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; }
   .camwrap video { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
   .guide { position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%); height: min(70%, 78vw * 88 / 63); aspect-ratio: 63/88; border: 2px solid rgba(255,255,255,.85); border-radius: 12px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.35); pointer-events: none; }
@@ -142,7 +150,7 @@
     </div>
     <div class="score" aria-live="polite"><span class="big" id="have">0</span><span class="of">/ 151</span><span class="pct" id="pct"></span></div>
     <div class="bar" id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="151" aria-label="Progreso"><i id="barfill"></i></div>
-    <div class="stats"><span>Faltan <b id="miss">0</b></span><span>Full art <b id="fa">0</b></span><span>Con foto <b id="nfoto">0</b></span></div>
+    <div class="stats"><span>Faltan <b id="miss">0</b></span><span>Full art <b id="fa">0</b></span><span>Con imagen <b id="nfoto">0</b></span><span>Valor aprox. <b id="val">0 €</b></span></div>
   </header>
 
   <section aria-label="Mapa de hojas">
@@ -189,6 +197,9 @@
     <div class="status" id="scanStatus" role="status" aria-live="polite"></div>
     <div id="scanPick" hidden style="display:flex;flex-direction:column;gap:12px">
       <div class="cands" id="cands"></div>
+      <h3>Tu carta exacta</h3>
+      <div class="status" id="cardStatus" role="status" aria-live="polite"></div>
+      <div class="cardgrid" id="cardgrid"></div>
       <label class="field"><span>¿No es ninguna? Busca por nombre o número</span><input id="scanSearch" type="search" autocomplete="off" placeholder="Ej. Golem o 76"></label>
       <div class="row">
         <label class="toggle"><input type="checkbox" id="scanFa"> Full art</label>
@@ -228,8 +239,9 @@
         </div>
       </div>
     </div>
+    <div class="cardinfo" id="detCard" hidden></div>
     <h3>Otras versiones</h3>
-    <p class="help">Busca en pokemontcg.io todas las cartas de este Pokémon, con precio aproximado, para ver si hay una mejor que la tuya. Cubre sobre todo sets en inglés.</p>
+    <p class="help">Busca todas las cartas de este Pokémon, ordenadas por precio aproximado, para ver si hay una mejor que la tuya. Usa pokemontcg.io (sets en inglés) y, si falla, TCGdex. Con «Es la mía» fijas la versión que tienes.</p>
     <div class="row"><button type="button" class="btn primary small" id="detSearch">Buscar versiones</button></div>
     <div class="status" id="detStatus" role="status" aria-live="polite"></div>
     <div class="versions" id="versions"></div>
@@ -273,6 +285,58 @@
   function toast(t) {
     var d = el('div', 'toast', t); document.body.appendChild(d);
     setTimeout(function () { d.remove(); }, 2600);
+  }
+
+  /* ---------- APIs de cartas ---------- */
+  var TCGDEX = 'https://api.tcgdex.net/v2/';
+  var APILANG = { 'Español': 'es', 'Inglés': 'en', 'Chino simplificado': 'zh-cn', 'Japonés': 'ja', 'Otro': 'en' };
+  function jget(url, headers) {
+    return fetch(url, { headers: headers || {} }).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
+  }
+  function eurText(v) { return v > 0 ? v.toFixed(2) + ' €' : 'sin precio'; }
+  function pool(items, max, fn) {
+    var out = new Array(items.length), next = 0;
+    function worker() {
+      if (next >= items.length) return Promise.resolve();
+      var i = next++;
+      return Promise.resolve().then(function () { return fn(items[i]); }).catch(function () { return null; }).then(function (r) { out[i] = r; return worker(); });
+    }
+    var ws = []; for (var k = 0; k < Math.min(max, items.length); k++) ws.push(worker());
+    return Promise.all(ws).then(function () { return out; });
+  }
+  function tcgdexEur(c) {
+    var p = c.pricing, cm = p && p.cardmarket;
+    if (cm) { var v = cm.trend != null ? cm.trend : cm.avg; if (v != null) return v; }
+    var tp = p && p.tcgplayer;
+    if (tp) {
+      var ks = Object.keys(tp);
+      for (var i = 0; i < ks.length; i++) { var m = tp[ks[i]]; if (m && typeof m === 'object' && m.marketPrice != null) return m.marketPrice * 0.92; }
+    }
+    return -1;
+  }
+  function fromTcgdex(c, lang) {
+    var cc = c.set && c.set.cardCount;
+    return { src: 'tcgdex', id: c.id, lang: lang, name: c.name, number: String(c.localId || ''), set: c.set && c.set.name || '',
+      total: cc && (cc.official || cc.total) || 0, rarity: c.rarity || '', img: c.image ? c.image + '/low.webp' : '', eur: tcgdexEur(c), upd: new Date().toISOString().slice(0, 10) };
+  }
+  function fromPtcg(c) {
+    var p = price(c);
+    return { src: 'ptcg', id: c.id, lang: 'en', name: c.name, number: String(c.number || ''), set: c.set && c.set.name || '',
+      total: c.set && c.set.printedTotal || 0, rarity: c.rarity || '', img: c.images && c.images.small || '', eur: p.v, upd: new Date().toISOString().slice(0, 10) };
+  }
+  function tcgdexDetail(id, lang) { return jget(TCGDEX + lang + '/cards/' + encodeURIComponent(id)).then(function (c) { return fromTcgdex(c, lang); }); }
+  /* cartas de un Pokémon en TCGdex (lista breve); si el idioma no tiene ninguna, prueba en inglés */
+  function tcgdexList(n, lang) {
+    function q(l) {
+      return jget(TCGDEX + l + '/cards?dexId=' + n).then(function (list) {
+        if (!Array.isArray(list) || list.length > 800) throw new Error('filtro');
+        return list;
+      }).catch(function () {
+        var nm = l === 'zh-cn' ? ZH[n - 1] : nameOf(n);
+        return jget(TCGDEX + l + '/cards?name=' + encodeURIComponent(nm)).then(function (x) { return Array.isArray(x) ? x : []; });
+      }).then(function (list) { return { lang: l, list: list }; });
+    }
+    return q(lang).then(function (r) { return r.list.length || lang === 'en' ? r : q('en'); });
   }
 
   /* ---------- estado ---------- */
@@ -345,20 +409,22 @@
   }
 
   function refresh() {
-    var vis = 0, pv = new Array(PAGES).fill(0), po = new Array(PAGES).fill(0), nf = 0;
+    var vis = 0, pv = new Array(PAGES).fill(0), po = new Array(PAGES).fill(0), nf = 0, val = 0;
     for (var n = 1; n <= TOTAL; n++) {
       var pk = pockets[n], own = have.has(n), pg = Math.floor((n - 1) / PER_PAGE);
       pk.classList.toggle('own', own);
       pk.classList.toggle('fa', fa.has(n));
-      var f = own && fotos[n];
+      var cd = info[n] && info[n].card;
+      var f = own && ((cd && cd.img) || fotos[n]);
+      if (own && cd && cd.eur > 0) val += cd.eur;
       pk.classList.toggle('foto', !!f);
       var slot = pk.firstChild;
-      slot.style.backgroundImage = f ? 'linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,0) 35%, rgba(0,0,0,0) 60%, rgba(0,0,0,.6)), url("' + fotos[n] + '")' : '';
+      slot.style.backgroundImage = f ? 'linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,0) 35%, rgba(0,0,0,0) 60%, rgba(0,0,0,.6)), url("' + String(f).replace(/"/g, '%22') + '")' : '';
       slot.setAttribute('aria-pressed', own ? 'true' : 'false');
       slot.setAttribute('aria-label', '#' + pad(n) + ' ' + nameOf(n) + ', ' + (own ? 'la tengo' : 'me falta'));
       pk.lastChild.setAttribute('aria-pressed', fa.has(n) ? 'true' : 'false');
       if (own) po[pg]++;
-      if (fotos[n]) nf++;
+      if (f) nf++;
       var show = matches(n); pk.hidden = !show;
       if (show) { pv[pg]++; vis++; }
     }
@@ -371,7 +437,7 @@
     });
     var c = have.size;
     $('have').textContent = c; $('pct').textContent = Math.round(c / TOTAL * 100) + ' %';
-    $('miss').textContent = TOTAL - c; $('fa').textContent = fa.size; $('nfoto').textContent = nf;
+    $('miss').textContent = TOTAL - c; $('fa').textContent = fa.size; $('nfoto').textContent = nf; $('val').textContent = Math.round(val) + ' €';
     $('barfill').style.width = (c / TOTAL * 100) + '%'; $('bar').setAttribute('aria-valuenow', c);
     document.querySelectorAll('#seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.mode === mode ? 'true' : 'false'); });
     $('empty').hidden = vis !== 0;
@@ -449,9 +515,40 @@
   var detN = 0;
   function renderDetPhoto() {
     var box = $('detPhoto'); box.textContent = '';
-    if (fotos[detN]) { var im = el('img'); im.src = fotos[detN]; im.alt = 'Mi carta de ' + nameOf(detN); box.appendChild(im); }
+    var cd = info[detN] && info[detN].card, src = (cd && cd.img) || fotos[detN];
+    if (src) { var im = el('img'); im.src = src; im.alt = 'Mi carta de ' + nameOf(detN); box.appendChild(im); }
     else box.appendChild(el('div', 'ph', 'Sin foto de tu carta'));
     $('detFotoDel').hidden = !fotos[detN];
+    var ci = $('detCard'); ci.textContent = ''; ci.hidden = !cd;
+    if (cd) {
+      ci.appendChild(el('b', null, cd.name + (cd.number ? ' · ' + cd.number + (cd.total ? '/' + cd.total : '') : '')));
+      ci.appendChild(el('span', null, [cd.set, cd.rarity].filter(Boolean).join(' · ')));
+      ci.appendChild(el('span', 'pr', 'Precio aprox. ' + eurText(cd.eur) + (cd.upd ? ' (' + cd.upd + ')' : '')));
+      var row = el('div', 'row');
+      var up = el('button', 'btn small', 'Actualizar precio'); up.type = 'button';
+      up.addEventListener('click', function () { refreshPrice(detN, up); });
+      var rm = el('button', 'btn small', 'Quitar carta'); rm.type = 'button';
+      rm.addEventListener('click', function () {
+        var i = info[detN] || {}; delete i.card; info[detN] = i;
+        if (!i.lang && !i.nota) delete info[detN];        save(); renderDetPhoto(); refresh();
+      });
+      row.appendChild(up); row.appendChild(rm); ci.appendChild(row);
+    }
+  }
+  function setCard(n, card) {
+    info[n] = Object.assign({}, info[n], { card: card });
+    if (!info[n].lang && card.lang) info[n].lang = { es: 'Español', en: 'Inglés', 'zh-cn': 'Chino simplificado', ja: 'Japonés' }[card.lang] || '';
+    have.add(n); save(); refresh();
+  }
+  function refreshPrice(n, btn) {
+    var cd = info[n] && info[n].card; if (!cd) return;
+    btn.disabled = true;
+    var req = cd.src === 'tcgdex' ? tcgdexDetail(cd.id, cd.lang)
+      : jget('https://api.pokemontcg.io/v2/cards/' + encodeURIComponent(cd.id), lsGet(APIKEY) ? { 'X-Api-Key': lsGet(APIKEY) } : {}).then(function (j) { return fromPtcg(j.data); });
+    req.then(function (nc) {
+      info[n].card = Object.assign({}, cd, { eur: nc.eur, upd: nc.upd }); save(); refresh();
+      if (n === detN) renderDetPhoto();
+    }).catch(function () { toast('No se pudo actualizar el precio'); btn.disabled = false; });
   }
   function openDetail(n) {
     detN = n;
@@ -472,8 +569,8 @@
     save(); refresh();
   });
   function saveInfo() {
-    info[detN] = { lang: $('detLang').value, nota: $('detNote').value.trim() };
-    if (!info[detN].lang && !info[detN].nota) delete info[detN];
+    info[detN] = Object.assign({}, info[detN], { lang: $('detLang').value, nota: $('detNote').value.trim() });
+    if (!info[detN].lang && !info[detN].nota && !info[detN].card) delete info[detN];
     save();
   }
   $('detLang').addEventListener('change', saveInfo);
@@ -505,26 +602,40 @@
     var headers = {}; var key = lsGet(APIKEY); if (key) headers['X-Api-Key'] = key;
     var url = 'https://api.pokemontcg.io/v2/cards?q=' + encodeURIComponent('nationalPokedexNumbers:' + n) +
       '&orderBy=-set.releaseDate&pageSize=60&select=id,name,rarity,images,set,cardmarket,tcgplayer';
-    fetch(url, { headers: headers }).then(function (r) {
-      if (!r.ok) throw new Error('http ' + r.status);
-      return r.json();
-    }).then(function (j) {
+    function show(cards) {
       if (n !== detN) return;
-      var cards = (j.data || []).map(function (c) { return { c: c, p: price(c) }; });
       if (!cards.length) { st.textContent = 'No he encontrado cartas de este Pokémon.'; return; }
-      var best = cards.reduce(function (a, b) { return b.p.v > a.p.v ? b : a; }, cards[0]);
-      st.textContent = cards.length + ' versiones. Precios orientativos (Cardmarket en €, o TCGplayer en $).';
-      cards.forEach(function (o) {
-        var d = el('div', 'ver' + (o === best && best.p.v > 0 ? ' best' : ''));
-        var im = el('img'); im.loading = 'lazy'; im.alt = o.c.name + ' ' + (o.c.set ? o.c.set.name : '');
-        im.src = o.c.images && o.c.images.small || ''; d.appendChild(im);
-        d.appendChild(el('b', null, o.c.name));
-        d.appendChild(el('span', null, (o.c.set ? o.c.set.name : '') + (o.c.rarity ? ' · ' + o.c.rarity : '')));
-        d.appendChild(el('span', 'pr', o.p.t));
+      cards.sort(function (a, b) { return b.eur - a.eur; });
+      var mine = info[n] && info[n].card, mineEur = mine && mine.eur > 0 ? mine.eur : null;
+      st.textContent = cards.length + ' versiones, de más cara a más barata. Precios orientativos (Cardmarket en €, o TCGplayer convertido).';
+      cards.forEach(function (c, idx) {
+        var d = el('div', 'ver' + (idx === 0 && c.eur > 0 ? ' best' : ''));
+        var im = el('img'); im.loading = 'lazy'; im.alt = c.name + ' ' + c.set; im.src = c.img; d.appendChild(im);
+        d.appendChild(el('b', null, c.name + (c.number ? ' · ' + c.number : '')));
+        d.appendChild(el('span', null, [c.set, c.rarity].filter(Boolean).join(' · ')));
+        d.appendChild(el('span', 'pr', eurText(c.eur)));
+        if (mineEur != null && c.eur > 0 && !(mine && mine.id === c.id)) {
+          var df = c.eur - mineEur;
+          d.appendChild(el('span', 'df', (df >= 0 ? '+' : '') + df.toFixed(2) + ' € vs la tuya'));
+        }
+        var b = el('button', 'btn small', mine && mine.id === c.id ? 'Es la tuya' : 'Es la mía'); b.type = 'button';
+        b.addEventListener('click', function () { setCard(n, c); renderDetPhoto(); show(cards); });
+        d.appendChild(b);
         out.appendChild(d);
       });
+    }
+    function viaTcgdex() {
+      st.textContent = 'pokemontcg.io no responde, probando con TCGdex…';
+      return tcgdexList(n, 'en').then(function (r) {
+        return pool(r.list.slice(0, 40), 6, function (c) { return tcgdexDetail(c.id, r.lang); });
+      }).then(function (cs) { out.textContent = ''; show(cs.filter(Boolean)); });
+    }
+    jget(url, headers).then(function (j) {
+      out.textContent = ''; show((j.data || []).map(fromPtcg));
     }).catch(function () {
-      st.textContent = 'No he podido consultar pokemontcg.io. Revisa la conexión o inténtalo más tarde.';
+      return viaTcgdex();
+    }).catch(function () {
+      st.textContent = 'No he podido consultar pokemontcg.io ni TCGdex. Revisa la conexión o inténtalo más tarde.';
     });
   });
 
@@ -612,13 +723,66 @@
 
   function setScanStatus(t) { $('scanStatus').textContent = t; }
 
+  var scanNum = null, pickedCard = null, choiceTok = 0;
+  function cropBottom(canvas, frac) {
+    var h = Math.round(canvas.height * frac);
+    var c = document.createElement('canvas'); c.width = canvas.width; c.height = h;
+    c.getContext('2d').drawImage(canvas, 0, canvas.height - h, canvas.width, h, 0, 0, canvas.width, h);
+    return c;
+  }
+  /* "025/165" -> {num: 25, total: 165}; el OCR a veces lee la barra como 7, | o l */
+  function parseNumber(text) {
+    var m = text.match(/(\d{1,3})\s*\/\s*(\d{2,3})/) || text.match(/(\d{1,3})\s*[|\\Il7]\s*(\d{2,3})/);
+    if (!m) return null;
+    var num = parseInt(m[1], 10), total = parseInt(m[2], 10);
+    return num > 0 ? { num: num, total: total } : null;
+  }
+  /* busca las cartas del Pokémon n y las ordena: primero las que coinciden con el número leído */
+  function loadChoices() {
+    var n = picked, tok = ++choiceTok, st = $('cardStatus'), grid = $('cardgrid');
+    grid.textContent = ''; pickedCard = null;
+    if (!n) { st.textContent = ''; return; }
+    var lang = APILANG[$('scanLangCard').value] || 'en';
+    st.textContent = 'Buscando cartas de ' + nameOf(n) + '…';
+    tcgdexList(n, lang).then(function (r) {
+      if (tok !== choiceTok) return;
+      var list = r.list.filter(function (c) { return c.image; });
+      var hit = scanNum ? list.filter(function (c) { return parseInt(c.localId, 10) === scanNum.num; }) : [];
+      var chosen = (hit.length ? hit : list).slice(0, 12);
+      return pool(chosen, 6, function (c) { return tcgdexDetail(c.id, r.lang); }).then(function (cs) {
+        if (tok !== choiceTok) return;
+        cs = cs.filter(Boolean);
+        if (scanNum && scanNum.total) cs.sort(function (a, b) { return (b.total === scanNum.total) - (a.total === scanNum.total); });
+        if (!cs.length) { st.textContent = 'No he encontrado cartas de ' + nameOf(n) + ' en este idioma. Prueba con otro idioma o guarda solo con tu foto.'; return; }
+        st.textContent = (hit.length ? 'Coincide con el número ' + scanNum.num + (scanNum.total ? '/' + scanNum.total : '') + '. ' : (scanNum ? 'No he encontrado el número ' + scanNum.num + '; estas son otras cartas. ' : 'No he leído el número; ')) + 'Elige la tuya (o ninguna):';
+        cs.forEach(function (c) {
+          var b = el('button', 'cc'); b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+          var im = el('img'); im.alt = c.name; im.loading = 'lazy'; im.src = c.img; b.appendChild(im);
+          b.appendChild(el('b', null, c.number + (c.total ? '/' + c.total : '')));
+          b.appendChild(el('span', null, c.set));
+          if (c.rarity) b.appendChild(el('span', null, c.rarity));
+          b.appendChild(el('span', 'pr', eurText(c.eur)));
+          b.addEventListener('click', function () {
+            var on = pickedCard !== c; pickedCard = on ? c : null;
+            grid.querySelectorAll('.cc').forEach(function (x) { x.setAttribute('aria-pressed', x === b && on ? 'true' : 'false'); });
+          });
+          grid.appendChild(b);
+        });
+        if (hit.length === 1 || (cs.length && scanNum && cs[0].number && parseInt(cs[0].number, 10) === scanNum.num && cs[0].total === scanNum.total)) grid.firstChild.click();
+      });
+    }).catch(function () {
+      if (tok === choiceTok) st.textContent = 'No he podido consultar TCGdex. Puedes guardar la carta solo con tu foto y asignarla luego desde «⋯».';
+    });
+  }
+  $('scanLangCard').addEventListener('change', loadChoices);
+
   function showPick(cands) {
     $('scanPick').hidden = false;
     var box = $('cands'); box.textContent = '';
-    cands.forEach(function (n) { addCandBtn(n, false); });
-    if (cands.length) selectCand(cands[0]); else { picked = 0; $('scanSave').disabled = true; }
-    $('scanFa').checked = false;
     $('scanLangCard').value = $('scanLang').value === 'chi_sim' ? 'Chino simplificado' : 'Español';
+    cands.forEach(function (n) { addCandBtn(n, false); });
+    if (cands.length) selectCand(cands[0]); else { picked = 0; $('scanSave').disabled = true; loadChoices(); }
+    $('scanFa').checked = false;
   }
   function addCandBtn(n) {
     var b = el('button', 'cand', '#' + pad(n) + ' ' + nameOf(n)); b.type = 'button';
@@ -627,6 +791,7 @@
     $('cands').appendChild(b);
   }
   function selectCand(n) {
+    var changed = picked !== n;
     picked = n;
     var found = false;
     document.querySelectorAll('#cands .cand').forEach(function (b) {
@@ -636,6 +801,7 @@
     if (!found) addCandBtn(n), selectCand(n);
     $('scanSave').disabled = !picked;
     $('scanFa').checked = fa.has(n);
+    if (changed) loadChoices();
   }
   $('scanSearch').addEventListener('input', function (e) {
     var q = norm(e.target.value.trim()).replace('#', '');
@@ -650,7 +816,7 @@
   function runOcr(canvas) {
     var lang = $('scanLang').value;
     $('scanPick').hidden = true;
-    scanCanvas = canvas;
+    scanCanvas = canvas; scanNum = null; picked = 0;
     $('scanPrev').src = canvas.toDataURL('image/jpeg', 0.5); $('scanPrev').hidden = false;
     setScanStatus('Cargando el lector de texto (la primera vez tarda unos segundos)…');
     loadTesseract().then(function () {
@@ -661,9 +827,14 @@
       var top = cropTop(canvas, 0.4);
       return w.recognize(top).then(function (r) {
         var c = findCandidates(r.data.text, lang);
-        if (c.length) return c;
-        setScanStatus('Probando con la carta entera…');
-        return w.recognize(canvas).then(function (r2) { return findCandidates(r2.data.text, lang); });
+        var pc = c.length ? Promise.resolve(c) : (setScanStatus('Probando con la carta entera…'), w.recognize(canvas).then(function (r2) { return findCandidates(r2.data.text, lang); }));
+        return pc.then(function (cands) {
+          setScanStatus('Leyendo el número de la carta…');
+          return w.recognize(cropBottom(canvas, 0.22)).then(function (rb) {
+            scanNum = parseNumber(rb.data.text);
+            return cands;
+          });
+        });
       });
     }).then(function (cands) {
       setScanStatus(cands.length ? 'Esto es lo que parece. Elige la correcta y guarda.' : 'No he reconocido el nombre. Búscalo abajo o haz otra foto más cerca y con luz.');
@@ -716,12 +887,14 @@
     have.add(n);
     if ($('scanFa').checked) fa.add(n);
     info[n] = Object.assign({}, info[n], { lang: $('scanLangCard').value });
+    if (pickedCard) info[n].card = pickedCard;
     setFoto(n, thumbOf(scanCanvas));
     save(); refresh();
     toast('#' + pad(n) + ' ' + nameOf(n) + ' guardada');
     $('scanPick').hidden = true; $('scanPrev').hidden = true;
     setScanStatus('Guardada. Ya puedes escanear otra.');
-    scanCanvas = null; picked = 0;
+    scanCanvas = null; picked = 0; pickedCard = null; choiceTok++;
+    $('cardgrid').textContent = ''; $('cardStatus').textContent = '';
   });
 
   refresh();

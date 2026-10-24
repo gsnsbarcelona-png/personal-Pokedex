@@ -7,9 +7,9 @@ Colección de cartas Pokémon estilo Pokédex: los 151 de Kanto en hojas de 9 bo
 - Marca qué cartas tienes y cuáles son full art, tocando cada bolsillo (FA para full art).
 - Filtra por Todas, Faltan, Tengo y Full art, y busca por nombre o número.
 - Muestra el progreso total y por hoja (17 hojas de 9).
-- Escanea una carta con la cámara o desde la galería. Lee el nombre con OCR y te propone candidatos para que confirmes.
-- Guarda una foto de tu carta en su hueco, para ver cuál tienes.
-- En el detalle de cada carta (botón `⋯`) puedes anotar idioma y set, y buscar otras versiones con precio aproximado en pokemontcg.io.
+- Escanea una carta con la cámara o desde la galería. Lee con OCR el nombre y el número (`025/165`), busca la carta exacta en TCGdex y te propone candidatas para que confirmes.
+- Guarda la carta real (imagen oficial, set, rareza y precio aproximado) en su hueco, y suma el valor aproximado de la colección.
+- En el detalle de cada carta (botón `⋯`) puedes anotar idioma y set, actualizar el precio, y ver todas las versiones ordenadas por precio para decidir si merece la pena mejorarla. «Es la mía» fija la versión que tienes.
 - Descarga y carga una copia de tus datos.
 
 ## Publicarlo en GitHub Pages
@@ -50,7 +50,8 @@ El archivo incluye tu colección inicial (61 cartas, 7 full art). Se usa solo la
 
 ## Servicios externos
 
-- **pokemontcg.io** para buscar versiones y precios. Funciona sin clave (1.000 consultas al día). Con una clave gratuita sube a 20.000, y se pone en **Copia y ajustes**. Cubre sobre todo sets en inglés, así que cartas de otros idiomas pueden no aparecer. Los precios son orientativos (Cardmarket en euros o TCGplayer en dólares).
+- **TCGdex** (`api.tcgdex.net`, sin clave) para identificar la carta escaneada, con cartas en español, inglés, chino y japonés. No todos los sets están en todos los idiomas: si no hay en el tuyo, prueba en inglés.
+- **pokemontcg.io** para la lista de versiones con precios (respaldo: TCGdex). Funciona sin clave (1.000 consultas al día). Con una clave gratuita sube a 20.000, y se pone en **Copia y ajustes**. Cubre sobre todo sets en inglés, así que cartas de otros idiomas pueden no aparecer. Los precios son orientativos (Cardmarket en euros o TCGplayer en dólares).
 - **Tesseract.js** (vía jsDelivr) para leer el nombre de la carta.
 - **Google Fonts** para las tipografías.
 
