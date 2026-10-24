@@ -248,6 +248,7 @@
       <div id="detPhoto"></div>
       <div class="col">
         <label class="field"><span>Idioma</span><select id="detLang"></select></label>
+        <label class="field"><span>Precio aprox. (€)</span><input id="detPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ej. 3.20"></label>
         <label class="field"><span>Set o nota</span><input id="detNote" type="text" placeholder="Ej. 151 chino, 181/151 SR" maxlength="80"></label>
         <div class="row">
           <label class="btn small">Poner foto<input id="detFile" type="file" accept="image/*" capture="environment"></label>
@@ -439,7 +440,7 @@
       pk.classList.toggle('fa', fa.has(n));
       var cd = info[n] && info[n].card;
       var f = own && ((cd && cd.img) || fotos[n]);
-      if (own && cd && cd.eur > 0) val += cd.eur;
+      if (own) val += cd && cd.eur > 0 ? cd.eur : (info[n] && info[n].precio) || 0;
       pk.classList.toggle('foto', !!f);
       var slot = pk.firstChild;
       slot.style.backgroundImage = f ? 'linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,0) 35%, rgba(0,0,0,0) 60%, rgba(0,0,0,.6)), url("' + String(f).replace(/"/g, '%22') + '")' : '';
@@ -620,7 +621,7 @@
     $('detTitle').textContent = '#' + pad(n) + ' ' + nameOf(n);
     $('detHave').checked = have.has(n); $('detFa').checked = fa.has(n);
     var i = info[n] || {};
-    $('detLang').value = i.lang || ''; $('detNote').value = i.nota || '';
+    $('detLang').value = i.lang || ''; $('detNote').value = i.nota || ''; $('detPrice').value = i.precio || '';
     $('detStatus').textContent = ''; $('versions').textContent = '';
     renderDetPhoto(); openModal($('det'));
   }
@@ -634,12 +635,14 @@
     save(); refresh();
   });
   function saveInfo() {
-    info[detN] = Object.assign({}, info[detN], { lang: $('detLang').value, nota: $('detNote').value.trim() });
-    if (!info[detN].lang && !info[detN].nota && !info[detN].card) delete info[detN];
-    save();
+    var pr = parseFloat($('detPrice').value);
+    info[detN] = Object.assign({}, info[detN], { lang: $('detLang').value, nota: $('detNote').value.trim(), precio: pr > 0 ? pr : 0 });
+    if (!info[detN].lang && !info[detN].nota && !info[detN].precio && !info[detN].card) delete info[detN];
+    save(); refresh();
   }
   $('detLang').addEventListener('change', saveInfo);
   $('detNote').addEventListener('change', saveInfo);
+  $('detPrice').addEventListener('change', saveInfo);
   $('detFile').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
     loadBitmap(f).then(function (bm) { return cropCard(toCanvas(bm, 1600)); }).then(function (c) {
@@ -980,6 +983,7 @@
     if ($('scanFa').checked) fa.add(n);
     info[n] = Object.assign({}, info[n], { lang: $('scanLangCard').value });
     if (pickedCard) info[n].card = pickedCard;
+    else if (scanNum && !info[n].nota) info[n].nota = scanNum.num + (scanNum.total ? '/' + scanNum.total : '') + (scanRar ? ' ' + scanRar : '');
     setFoto(n, thumbOf(scanCanvas));
     save(); refresh();
     toast('#' + pad(n) + ' ' + nameOf(n) + ' guardada');
