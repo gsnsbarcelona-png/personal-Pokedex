@@ -46,6 +46,19 @@ El OCR (Tesseract.js) se descarga la primera vez que escaneas, así que necesita
 
 Todo se guarda **solo en el navegador** donde lo uses (`localStorage`): marcas, notas, precios y fotos en miniatura. Si borras los datos del sitio o cambias de navegador, se pierden. Descarga la copia de vez en cuando.
 
+## Copia automática en GitHub
+
+Guarda `data/copia.json` en este repositorio (marcas, notas, precios y fotos), unos 20 segundos después de cada cambio. En un navegador vacío, la página ofrece cargarla sola. El repositorio es público, así que esas fotos también lo son.
+
+Para activarla, crea un token que solo pueda tocar este repositorio:
+
+1. GitHub → tu foto → **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**.
+2. **Repository access**: *Only select repositories* → `personal-Pokedex`.
+3. **Permissions** → *Repository permissions* → **Contents**: *Read and write*.
+4. Genera el token, cópialo y pégalo en **Copia y ajustes** → **Token de GitHub**. Se guarda solo en ese navegador.
+
+Cuando el token caduque, crea otro y pégalo igual.
+
 ## Datos de partida
 
 El archivo incluye tu colección inicial (61 cartas, 7 full art). Se usa solo la primera vez. Después manda lo que haya guardado el navegador. Para empezar de cero con otros datos, edita las listas `SEED_HAVE` y `SEED_FA` al final de `index.html`.

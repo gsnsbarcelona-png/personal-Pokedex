@@ -130,7 +130,7 @@
   <header>
     <div class="top">
       <div>
-        <p class="eyebrow">Kanto · 151 especies · 17 hojas · v4</p>
+        <p class="eyebrow">Kanto · 151 especies · 17 hojas · v5</p>
         <h1>Proyecto 151</h1>
       </div>
       <button type="button" class="iconbtn" id="btnMenu">Copia y ajustes</button>
@@ -251,6 +251,14 @@
       <button type="button" class="btn primary" id="btnExport">Descargar copia</button>
       <label class="btn">Cargar copia<input id="importFile" type="file" accept="application/json,.json"></label>
     </div>
+    <h3>Copia automática en GitHub</h3>
+    <p class="help">Guarda tus marcas y fotos en el repositorio de la página, para no perderlas si el navegador borra sus datos. Hace falta un token de GitHub (ver README) que solo se guarda en este navegador. Atención: el repositorio es público, así que las fotos de tus cartas también lo serán.</p>
+    <label class="field"><span>Token de GitHub</span><input id="ghToken" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+    <div class="row">
+      <button type="button" class="btn small primary" id="ghPush">Guardar ahora</button>
+      <button type="button" class="btn small" id="ghPull">Restaurar de GitHub</button>
+    </div>
+    <div class="status" id="ghStatus" role="status"></div>
     <div class="status" id="menuStatus" role="status"></div>
   </div>
 </div>
@@ -293,9 +301,11 @@
     }
     for (var n = 1; n <= TOTAL; n++) { var f = lsGet(FOTO + n); if (f) fotos[n] = f; }
   })();
+  var scheduleSyncHook = null;
   function save() {
     var ok = lsSet(KEY, JSON.stringify({ have: Array.from(have).sort(function (a, b) { return a - b; }), fa: Array.from(fa).sort(function (a, b) { return a - b; }), info: info }));
     if (!ok) toast('No se pudo guardar en este navegador');
+    if (scheduleSyncHook) scheduleSyncHook();
   }
   function setFoto(n, data) {
     if (data) {
@@ -539,11 +549,76 @@
   $('detFotoDel').addEventListener('click', function () { setFoto(detN, null); renderDetPhoto(); refresh(); });
 
   /* ---------- copia y ajustes ---------- */
-  $('btnMenu').addEventListener('click', function () { $('menuStatus').textContent = ''; openModal($('menu')); });
+  $('btnMenu').addEventListener('click', function () { $('ghToken').value = lsGet(GHTOKEN) || ''; ghStatus(lsGet(GHLAST) ? 'Última copia en GitHub: ' + lsGet(GHLAST) : ''); $('menuStatus').textContent = ''; openModal($('menu')); });
   $('menuClose').addEventListener('click', function () { closeModal($('menu')); });
+  function buildBackup() { return { version: 2, have: Array.from(have), fa: Array.from(fa), info: info, fotos: fotos, fecha: new Date().toISOString() }; }
+  function applyBackup(s) {
+    if (!s || !Array.isArray(s.have)) throw new Error('formato');
+    have = new Set(s.have.map(Number)); fa = new Set((s.fa || []).map(Number)); info = s.info || {};
+    for (var n = 1; n <= TOTAL; n++) lsDel(FOTO + n);
+    fotos = {};
+    Object.keys(s.fotos || {}).forEach(function (k) { setFoto(Number(k), s.fotos[k]); });
+    save(); refresh();
+  }
+
+  /* ---------- copia en GitHub ---------- */
+  var GH_URL = 'https://api.github.com/repos/gsnsbarcelona-png/personal-Pokedex/contents/data/copia.json', GH_REF = 'main';
+  var GHTOKEN = 'proyecto151.ghtoken', GHLAST = 'proyecto151.ghlast', syncTimer = 0;
+  function ghHeaders(extra) {
+    var h = Object.assign({ Accept: 'application/vnd.github+json' }, extra || {}), t = lsGet(GHTOKEN);
+    if (t) h.Authorization = 'Bearer ' + t;
+    return h;
+  }
+  function b64(str) {
+    var bytes = new TextEncoder().encode(str), bin = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function ghStatus(t) { $('ghStatus').textContent = t; }
+  function ghPush() {
+    if (!lsGet(GHTOKEN)) return Promise.reject(new Error('sin token'));
+    return fetch(GH_URL + '?ref=' + GH_REF, { headers: ghHeaders() }).then(function (r) {
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    }).then(function (cur) {
+      var body = { message: 'Copia automática de la colección', content: b64(JSON.stringify(buildBackup())), branch: GH_REF };
+      if (cur && cur.sha) body.sha = cur.sha;
+      return fetch(GH_URL, { method: 'PUT', headers: ghHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
+    }).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      lsSet(GHLAST, new Date().toLocaleString('es-ES'));
+    });
+  }
+  function ghPull() {
+    return fetch(GH_URL + '?ref=' + GH_REF, { headers: ghHeaders({ Accept: 'application/vnd.github.raw+json' }) }).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    });
+  }
+  function scheduleSync() {
+    if (!lsGet(GHTOKEN)) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(function () { ghPush().catch(function () { toast('No se pudo guardar la copia en GitHub'); }); }, 20000);
+  }
+  scheduleSyncHook = scheduleSync;
+  $('ghToken').addEventListener('change', function (e) {
+    var v = e.target.value.trim(); if (v) lsSet(GHTOKEN, v); else lsDel(GHTOKEN);
+    ghStatus(v ? 'Token guardado en este navegador.' : 'Token borrado.');
+  });
+  $('ghPush').addEventListener('click', function () {
+    ghStatus('Guardando en GitHub…');
+    ghPush().then(function () { ghStatus('Guardado en GitHub (' + lsGet(GHLAST) + ').'); })
+      .catch(function (e) { ghStatus(e.message === 'sin token' ? 'Pega primero el token de GitHub.' : 'No se pudo guardar (' + e.message + '). Revisa el token y sus permisos.'); });
+  });
+  $('ghPull').addEventListener('click', function () {
+    if (!confirm('Esto sustituye lo que tienes ahora en este navegador por la copia de GitHub. ¿Seguir?')) return;
+    ghStatus('Descargando…');
+    ghPull().then(function (s) { applyBackup(s); ghStatus('Restaurado: ' + have.size + ' cartas.'); })
+      .catch(function () { ghStatus('No hay copia en GitHub, o no se pudo descargar.'); });
+  });
   $('btnExport').addEventListener('click', function () {
-    var data = { version: 2, have: Array.from(have), fa: Array.from(fa), info: info, fotos: fotos, fecha: new Date().toISOString() };
-    var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    var blob = new Blob([JSON.stringify(buildBackup())], { type: 'application/json' });
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'proyecto-151-copia.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
@@ -552,13 +627,7 @@
   $('importFile').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
     f.text().then(function (t) {
-      var s = JSON.parse(t);
-      if (!Array.isArray(s.have)) throw new Error('formato');
-      have = new Set(s.have.map(Number)); fa = new Set((s.fa || []).map(Number)); info = s.info || {};
-      for (var n = 1; n <= TOTAL; n++) lsDel(FOTO + n);
-      fotos = {};
-      Object.keys(s.fotos || {}).forEach(function (k) { setFoto(Number(k), s.fotos[k]); });
-      save(); refresh();
+      applyBackup(JSON.parse(t));
       $('menuStatus').textContent = 'Copia cargada: ' + have.size + ' cartas.';
     }).catch(function () { $('menuStatus').textContent = 'Ese archivo no es una copia válida.'; });
     e.target.value = '';
@@ -780,6 +849,11 @@
   });
 
   refresh();
+  if (lsGet(KEY) == null) {
+    ghPull().then(function (s) {
+      if (s && Array.isArray(s.have) && confirm('He encontrado una copia de tu colección en GitHub (' + s.have.length + ' cartas). ¿La cargo?')) applyBackup(s);
+    }).catch(function () {});
+  }
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
 })();
 </script>
